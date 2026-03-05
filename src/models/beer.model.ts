@@ -28,17 +28,17 @@ export interface IBeer extends Document {
 
 const profileScoresSchema = new Schema<IProfileScores>(
   {
-    Astringency: { type: Number, required: true, min: 0, max: 100 },
-    Body: { type: Number, required: true, min: 0, max: 100 },
-    Alcohol: { type: Number, required: true, min: 0, max: 100 },
-    Bitter: { type: Number, required: true, min: 0, max: 100 },
-    Sweet: { type: Number, required: true, min: 0, max: 100 },
-    Sour: { type: Number, required: true, min: 0, max: 100 },
-    Salty: { type: Number, required: true, min: 0, max: 100 },
-    Fruits: { type: Number, required: true, min: 0, max: 100 },
-    Hoppy: { type: Number, required: true, min: 0, max: 100 },
-    Spices: { type: Number, required: true, min: 0, max: 100 },
-    Malty: { type: Number, required: true, min: 0, max: 100 },
+    Astringency: { type: Number, required: true, min: 0 },
+    Body: { type: Number, required: true, min: 0 },
+    Alcohol: { type: Number, required: true, min: 0 },
+    Bitter: { type: Number, required: true, min: 0 },
+    Sweet: { type: Number, required: true, min: 0 },
+    Sour: { type: Number, required: true, min: 0 },
+    Salty: { type: Number, required: true, min: 0 },
+    Fruits: { type: Number, required: true, min: 0 },
+    Hoppy: { type: Number, required: true, min: 0 },
+    Spices: { type: Number, required: true, min: 0 },
+    Malty: { type: Number, required: true, min: 0 },
   },
   { _id: false },
 );
