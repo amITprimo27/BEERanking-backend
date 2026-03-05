@@ -9,6 +9,7 @@
   "scripts": {
     "start": "tsc && node --env-file=./env/.env.dev ./dist/src/server.js",
     "dev": "nodemon ./src/server.ts",
+    "import:beers": "ts-node ./src/scripts/import-beers.ts",
     "lint": "eslint . --ext .ts",
     "test": "tsc && jest --runInBand --detectOpenHandles --forceExit"
   },
