@@ -258,5 +258,27 @@ describe("User routes integration", () => {
 
       expect(user?.email).toBe("user-route@test.com"); // Email should not change
     });
+
+    it("returns 409 for duplicate username", async () => {
+      // Create another user with different username
+      const otherUser = await User.create({
+        username: "other-user",
+        email: "other@test.com",
+        password: "secret",
+      });
+
+      // Try to update current user with other user's username
+      const response = await request(app)
+        .patch("/api/users/me")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ username: "other-user" });
+
+      expect(response.status).toBe(409);
+      expect(response.body.error).toBeDefined();
+
+      // Verify username unchanged
+      const user = await User.findById(userId);
+      expect(user?.username).toBe("user-route");
+    });
   });
 });

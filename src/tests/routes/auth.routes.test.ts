@@ -135,7 +135,7 @@ describe("Auth routes integration", () => {
 
     it("signs in user with correct credentials", async () => {
       const response = await request(app).post("/api/auth/signin").send({
-        email: "signin@test.com",
+        username: "signinuser",
         password: "correctpassword",
       });
 
@@ -143,12 +143,12 @@ describe("Auth routes integration", () => {
       expect(response.body.message).toBe("User signed in");
       expect(response.body.token).toBeDefined();
       expect(response.body.user).toBeDefined();
-      expect(response.body.user.email).toBe("signin@test.com");
+      expect(response.body.user.username).toBe("signinuser");
     });
 
     it("returns 401 for wrong password", async () => {
       const response = await request(app).post("/api/auth/signin").send({
-        email: "signin@test.com",
+        username: "signinuser",
         password: "wrongpassword",
       });
 
@@ -158,7 +158,7 @@ describe("Auth routes integration", () => {
 
     it("returns 401 for non-existent user", async () => {
       const response = await request(app).post("/api/auth/signin").send({
-        email: "nonexistent@test.com",
+        username: "nonexistentuser",
         password: "password",
       });
 
@@ -166,7 +166,7 @@ describe("Auth routes integration", () => {
       expect(response.body.error).toBeDefined();
     });
 
-    it("returns 400 for missing email", async () => {
+    it("returns 400 for missing username", async () => {
       const response = await request(app).post("/api/auth/signin").send({
         password: "password",
       });
@@ -177,7 +177,7 @@ describe("Auth routes integration", () => {
 
     it("returns 400 for missing password", async () => {
       const response = await request(app).post("/api/auth/signin").send({
-        email: "signin@test.com",
+        username: "signinuser",
       });
 
       expect(response.status).toBe(400);
@@ -186,7 +186,7 @@ describe("Auth routes integration", () => {
 
     it("returns valid JWT token after signin", async () => {
       const response = await request(app).post("/api/auth/signin").send({
-        email: "signin@test.com",
+        username: "signinuser",
         password: "correctpassword",
       });
 
