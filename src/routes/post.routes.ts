@@ -23,6 +23,12 @@ router.get("/me", authMiddleware, (req, res) =>
 );
 
 /**
+ * GET /api/posts/:id
+ * Get single post by ID
+ */
+router.get("/:id", (req, res) => postController.getPostById(req, res));
+
+/**
  * POST /api/posts
  * Add new post with image upload
  * Expects multipart/form-data with image file

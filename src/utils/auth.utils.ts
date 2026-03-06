@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import bcrypt from "bcrypt";
 
 export type TokenContent = {
   userId: string;
@@ -41,5 +42,17 @@ export class AuthUtils {
     }
 
     return authHeader.split(" ")[1];
+  }
+
+  static async hashPassword(password: string): Promise<string> {
+    const saltRounds = 10;
+    return bcrypt.hash(password, saltRounds);
+  }
+
+  static async comparePassword(
+    password: string,
+    hashedPassword: string,
+  ): Promise<boolean> {
+    return bcrypt.compare(password, hashedPassword);
   }
 }

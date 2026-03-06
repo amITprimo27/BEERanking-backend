@@ -11,7 +11,12 @@
     "dev": "nodemon ./src/server.ts",
     "import:beers": "ts-node ./src/scripts/import-beers.ts",
     "lint": "eslint . --ext .ts",
-    "test": "tsc && jest --runInBand --detectOpenHandles --forceExit"
+    "test": "tsc && jest --runInBand --detectOpenHandles --forceExit",
+    "test:auth": "tsc && jest --runInBand --detectOpenHandles --forceExit src/tests/routes/auth.routes.test.ts",
+    "test:beer": "tsc && jest --runInBand --detectOpenHandles --forceExit src/tests/routes/beer.routes.test.ts",
+    "test:post": "tsc && jest --runInBand --detectOpenHandles --forceExit src/tests/routes/post.routes.test.ts",
+    "test:user": "tsc && jest --runInBand --detectOpenHandles --forceExit src/tests/routes/user.routes.test.ts",
+    "test:general": "tsc && jest --runInBand --detectOpenHandles --forceExit src/tests/routes/general.routes.test.ts"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

@@ -24,20 +24,24 @@ export class PostController extends BaseController<IPost> {
    * Query params: page (default 1), limit (default 10)
    */
   async getAllPosts(req: Request, res: Response) {
-    try {
-      // TODO: Implement pagination logic
-      // - Extract page and limit from query
-      // - Calculate skip value
-      // - Execute query with skip and limit
-      // - Return posts with total count
-      const posts = await this.model.find().limit(10);
-      res.json(posts);
-    } catch (error) {
-      res.status(500).json({
-        error:
-          error instanceof Error ? error.message : "An unknown error occurred",
-      });
-    }
+    // TODO: Implement pagination logic
+    // - Extract page and limit from query
+    // - Calculate skip value
+    // - Execute query with skip and limit
+    // - Return posts with total count
+    res.json({ message: "Get all posts", data: [] });
+  }
+
+  /**
+   * Get single post by ID
+   */
+  async getPostById(req: Request, res: Response) {
+    // TODO: Implement get post by ID
+    // - Validate post ID format
+    // - Fetch post from DB
+    // - Return 404 if not found
+    const { id } = req.params;
+    res.json({ message: "Get post by ID", data: {} });
   }
 
   /**
@@ -61,7 +65,7 @@ export class PostController extends BaseController<IPost> {
     // TODO: Implement post deletion
     // - Delete associated image file
     // - Delete post document
-    await this.del(req, res);
+    res.json({ message: "Post deleted" });
   }
 
   /**
@@ -70,20 +74,13 @@ export class PostController extends BaseController<IPost> {
    * Query params: page (default 1), limit (default 10)
    */
   async getUserPosts(req: Request, res: Response) {
-    try {
-      // TODO: Implement getting current user's posts with pagination
-      // - Get user ID from req.user (set by auth middleware)
-      // - Extract page and limit from query
-      // - Calculate skip value
-      // - Query posts filtered by user ID with pagination
-      // - Return posts with total count
-      res.json({ message: "User posts retrieved" });
-    } catch (error) {
-      res.status(500).json({
-        error:
-          error instanceof Error ? error.message : "An unknown error occurred",
-      });
-    }
+    // TODO: Implement getting current user's posts with pagination
+    // - Get user ID from req.user (set by auth middleware)
+    // - Extract page and limit from query
+    // - Calculate skip value
+    // - Query posts filtered by user ID with pagination
+    // - Return posts with total count
+    res.json({ message: "User posts retrieved", data: [] });
   }
 
   /**

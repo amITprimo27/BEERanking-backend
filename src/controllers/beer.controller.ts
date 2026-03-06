@@ -11,5 +11,11 @@ export class BeerController extends BaseController<IBeer> {
    * Search beers by AI query
    * Parses user natural language query and searches by profile scores
    */
-  async aiSearch(req: Request, res: Response) {}
+  async aiSearch(req: Request, res: Response) {
+    // TODO: Implement AI search
+    // - Parse natural language query
+    // - Map keywords to profile scores
+    // - Search and sort by matching attributes
+    res.json({ message: "AI search", data: [] });
+  }
 }
