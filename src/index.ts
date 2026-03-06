@@ -3,6 +3,10 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import swaggerUi from "swagger-ui-express";
 // import specs from "./swagger";
+import { beerRouter } from "./routes/beer.route";
+import { postRouter } from "./routes/post.routes";
+import { userRouter } from "./routes/user.route";
+import { authRouter } from "./routes/auth.routes";
 
 const app = express();
 
@@ -33,7 +37,14 @@ const intApp = () => {
 
     // Routes
     app.use("/uploads", express.static("public/uploads"));
-    //TODO: add routes here
+
+    const apiRouter = express.Router();
+    apiRouter.use("/beers", beerRouter);
+    apiRouter.use("/posts", postRouter);
+    apiRouter.use("/users", userRouter);
+    apiRouter.use("/auth", authRouter);
+    app.use("/api", apiRouter);
+
     //TODO: react app static files
 
     const dbUri = process.env.MONGODB_URI;
