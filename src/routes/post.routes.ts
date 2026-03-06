@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { PostController } from "../controllers/post.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
+import { commentRouter } from "./comment.routes";
 
 const router = Router();
 const postController = new PostController();
@@ -65,5 +66,11 @@ router.delete("/:id", authMiddleware, (req, res) =>
 router.post("/:id/like", authMiddleware, (req, res) =>
   postController.toggleLike(req, res),
 );
+
+/**
+ * Comments sub-routes
+ * /api/posts/:postId/comments
+ */
+router.use("/:postId/comments", commentRouter);
 
 export { router as postRouter };
