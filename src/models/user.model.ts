@@ -7,6 +7,7 @@ export interface IUser extends Document {
   profilePic?: string;
   favoriteBeers: mongoose.Types.ObjectId[]; // References to Beer documents
   googleId?: string; // For Google OAuth
+  refreshTokens: string[]; // Store refresh tokens for rotation/revocation
   createdAt: Date;
   updatedAt: Date;
 }
@@ -49,6 +50,11 @@ const userSchema = new Schema<IUser>(
       select: false,
       sparse: true, // Allows multiple null values
     },
+    refreshTokens: {
+      type: [String],
+      default: [],
+      select: false,
+    },
   },
   {
     timestamps: true,
@@ -58,5 +64,6 @@ const userSchema = new Schema<IUser>(
 // Index for faster lookups
 userSchema.index({ email: 1 });
 userSchema.index({ googleId: 1 });
+userSchema.index({ username: 1 });
 
 export const User = mongoose.model<IUser>("User", userSchema);
