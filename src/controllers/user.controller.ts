@@ -3,8 +3,11 @@ import { User, IUser } from "../models/user.model";
 import { BaseController } from "./base.controler";
 import { AuthRequest } from "../middlewares/auth.middleware";
 import * as fs from "fs";
-import * as path from "path";
 import { FileRequest } from "../middlewares/multer.middleware";
+import {
+  UPLOADS_ROUTE_PREFIX,
+  toPublicAbsolutePath,
+} from "../utils/paths.utils";
 
 export class UserController extends BaseController<IUser> {
   constructor() {
@@ -69,6 +72,12 @@ export class UserController extends BaseController<IUser> {
         return res.status(400).json({ error: "Invalid user ID" });
       }
 
+      // Get current user to check for existing profile picture
+      const currentUser = await User.findById(userId);
+      if (!currentUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
       const { username, favoriteBeers } = req.body;
       const updateData: Record<string, unknown> = {};
 
@@ -106,9 +115,18 @@ export class UserController extends BaseController<IUser> {
       }
 
       // Handle optional profile picture upload
+      let oldProfilePicPath: string | null = null;
       if (req.file) {
         const file = req.file;
-        updateData.profilePic = `/uploads/${file.filename}`;
+        updateData.profilePic = `${UPLOADS_ROUTE_PREFIX}${file.filename}`;
+
+        // Store old profile pic path for deletion after successful update
+        if (
+          currentUser.profilePic &&
+          currentUser.profilePic.startsWith(UPLOADS_ROUTE_PREFIX)
+        ) {
+          oldProfilePicPath = toPublicAbsolutePath(currentUser.profilePic);
+        }
       }
 
       // Ensure at least one field is being updated
@@ -124,6 +142,11 @@ export class UserController extends BaseController<IUser> {
 
       if (!updatedUser) {
         return res.status(404).json({ error: "User not found" });
+      }
+
+      // Delete old profile picture if it was replaced successfully
+      if (oldProfilePicPath && fs.existsSync(oldProfilePicPath)) {
+        fs.unlinkSync(oldProfilePicPath);
       }
 
       return res.json({

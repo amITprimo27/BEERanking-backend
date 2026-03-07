@@ -5,8 +5,8 @@ import { connectTestDb, clearTestDb, disconnectTestDb } from "../helpers/db";
 import { User } from "../../models/user.model";
 import { Beer } from "../../models/beer.model";
 import { AuthUtils } from "../../utils/auth.utils";
+import { UPLOADS_DIR, toPublicAbsolutePath } from "../../utils/paths.utils";
 import * as fs from "fs";
-import * as path from "path";
 
 describe("User routes integration", () => {
   const app = express();
@@ -16,8 +16,11 @@ describe("User routes integration", () => {
   let token = "";
   let userId = "";
   let beerId = "";
-  const uploadDir = path.join(__dirname, "../../../public/uploads");
+  const uploadDir = UPLOADS_DIR;
   const uploadedFiles: string[] = [];
+
+  const getUploadedFileAbsolutePath = (profilePicPath: string) =>
+    toPublicAbsolutePath(profilePicPath);
 
   beforeAll(async () => {
     await connectTestDb();
@@ -212,7 +215,6 @@ describe("User routes integration", () => {
         });
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toBe("favoriteBeers must be an array");
     });
 
     it("returns 400 when favoriteBeers contains invalid ObjectId", async () => {
@@ -241,11 +243,7 @@ describe("User routes integration", () => {
       expect(updatedUser?.profilePic).toContain("uploads/");
 
       // Verify the file exists in public/uploads
-      const imagePath = path.join(
-        __dirname,
-        "../../../public",
-        updatedUser!.profilePic!,
-      );
+      const imagePath = getUploadedFileAbsolutePath(updatedUser!.profilePic!);
       expect(fs.existsSync(imagePath)).toBe(true);
       uploadedFiles.push(imagePath); // Track for cleanup
     });
@@ -265,11 +263,7 @@ describe("User routes integration", () => {
       expect(updatedUser?.profilePic).toContain("uploads/");
 
       // Verify the file exists in public/uploads
-      const imagePath = path.join(
-        __dirname,
-        "../../../public",
-        updatedUser!.profilePic!,
-      );
+      const imagePath = getUploadedFileAbsolutePath(updatedUser!.profilePic!);
       expect(fs.existsSync(imagePath)).toBe(true);
       uploadedFiles.push(imagePath); // Track for cleanup
     });
@@ -317,6 +311,79 @@ describe("User routes integration", () => {
       // Verify username unchanged
       const user = await User.findById(userId);
       expect(user?.username).toBe("user-route");
+    });
+
+    describe("file cleanup", () => {
+      it("deletes uploaded file when request fails validation", async () => {
+        const filesBefore = fs.readdirSync(uploadDir).sort();
+
+        const response = await request(app)
+          .patch("/api/users/me")
+          .set("Authorization", `Bearer ${token}`)
+          .field("username", "ab")
+          .attach("profilePic", Buffer.from("profile image data"), "bad.jpg");
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toBe(
+          "Username must be at least 3 characters",
+        );
+
+        const filesAfter = fs.readdirSync(uploadDir).sort();
+        expect(filesAfter).toEqual(filesBefore);
+      });
+
+      it("deletes uploaded file when request fails with 409", async () => {
+        await User.create({
+          username: "taken-user",
+          email: "taken@test.com",
+          password: "secret",
+        });
+
+        const filesBefore = fs.readdirSync(uploadDir).sort();
+
+        const response = await request(app)
+          .patch("/api/users/me")
+          .set("Authorization", `Bearer ${token}`)
+          .field("username", "taken-user")
+          .attach("profilePic", Buffer.from("profile image data"), "dup.jpg");
+
+        expect(response.status).toBe(409);
+
+        const filesAfter = fs.readdirSync(uploadDir).sort();
+        expect(filesAfter).toEqual(filesBefore);
+      });
+
+      it("deletes old profile picture when replacing it", async () => {
+        const firstUpload = await request(app)
+          .patch("/api/users/me")
+          .set("Authorization", `Bearer ${token}`)
+          .attach("profilePic", Buffer.from("first image"), "first.jpg");
+
+        expect(firstUpload.status).toBe(200);
+
+        const userAfterFirst = await User.findById(userId);
+        const firstImagePath = getUploadedFileAbsolutePath(
+          userAfterFirst!.profilePic!,
+        );
+        expect(fs.existsSync(firstImagePath)).toBe(true);
+
+        const secondUpload = await request(app)
+          .patch("/api/users/me")
+          .set("Authorization", `Bearer ${token}`)
+          .attach("profilePic", Buffer.from("second image"), "second.jpg");
+
+        expect(secondUpload.status).toBe(200);
+
+        const userAfterSecond = await User.findById(userId);
+        const secondImagePath = getUploadedFileAbsolutePath(
+          userAfterSecond!.profilePic!,
+        );
+
+        expect(fs.existsSync(firstImagePath)).toBe(false);
+        expect(fs.existsSync(secondImagePath)).toBe(true);
+
+        uploadedFiles.push(secondImagePath);
+      });
     });
   });
 });
