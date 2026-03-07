@@ -106,6 +106,47 @@ describe("Post routes integration", () => {
     uploadedFiles.push(imagePath); // Track for cleanup
   });
 
+  it("POST /api/posts rejects rating below 1", async () => {
+    const response = await request(app)
+      .post("/api/posts")
+      .set("Authorization", `Bearer ${token}`)
+      .field("rating", "0")
+      .field("beer", beerId)
+      .field("description", "Bad rating")
+      .attach("image", Buffer.from("test"), "test.jpg");
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBeDefined();
+  });
+
+  it("POST /api/posts rejects rating above 5", async () => {
+    const response = await request(app)
+      .post("/api/posts")
+      .set("Authorization", `Bearer ${token}`)
+      .field("rating", "6")
+      .field("beer", beerId)
+      .field("description", "Bad rating")
+      .attach("image", Buffer.from("test"), "test.jpg");
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBeDefined();
+  });
+
+  it("POST /api/posts rejects non-existent beer ID", async () => {
+    const fakeBeerId = "507f1f77bcf86cd799439011";
+
+    const response = await request(app)
+      .post("/api/posts")
+      .set("Authorization", `Bearer ${token}`)
+      .field("rating", "4")
+      .field("beer", fakeBeerId)
+      .field("description", "Nonexistent beer")
+      .attach("image", Buffer.from("test"), "test.jpg");
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBeDefined();
+  });
+
   it("GET /api/posts returns stored posts", async () => {
     await Post.create({
       image: "uploads/test2.jpg",

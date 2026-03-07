@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import { randomUUID } from "crypto";
 
 export type TokenContent = {
   userId: string;
@@ -7,7 +8,15 @@ export type TokenContent = {
 
 export class AuthUtils {
   private static get secret(): string {
-    return process.env.JWT_SECRET || "secretkey";
+    const secret = process.env.JWT_SECRET;
+
+    if (!secret || secret.length < 32) {
+      throw new Error(
+        "JWT_SECRET is required and must be at least 32 characters long",
+      );
+    }
+
+    return secret;
   }
 
   static generateAccessToken(tokenContent: TokenContent): string {
@@ -19,7 +28,10 @@ export class AuthUtils {
   static generateRefreshToken(tokenContent: TokenContent): string {
     const secret = this.secret;
     const exp = parseInt(process.env.JWT_REFRESH_EXPIRES_IN || "86400"); // 24 hours
-    return jwt.sign(tokenContent, secret, { expiresIn: exp });
+    return jwt.sign(tokenContent, secret, {
+      expiresIn: exp,
+      jwtid: randomUUID(),
+    });
   }
 
   static generateTokens(tokenContent: TokenContent): {

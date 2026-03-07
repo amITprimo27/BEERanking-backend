@@ -13,10 +13,17 @@ router.post("/signup", (req, res) => authController.signup(req, res));
 
 /**
  * POST /api/auth/signin
- * Sign in with email and password
- * Expects: { email, password }
+ * Sign in with username and password
+ * Expects: { username, password }
  */
 router.post("/signin", (req, res) => authController.signin(req, res));
+
+/**
+ * POST /api/auth/refresh
+ * Refresh access token using refresh token
+ * Expects: { refreshToken }
+ */
+router.post("/refresh", (req, res) => authController.refresh(req, res));
 
 /**
  * POST /api/auth/signup/google
