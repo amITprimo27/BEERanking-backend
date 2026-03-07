@@ -4,7 +4,7 @@ import { AuthUtils } from "../utils/auth.utils";
 import { OAuth2Client } from "google-auth-library";
 
 export class AuthController {
-  private isDuplicateKeyError(error: unknown): boolean {
+  private _isDuplicateKeyError(error: unknown): boolean {
     return (
       typeof error === "object" &&
       error !== null &&
@@ -13,13 +13,13 @@ export class AuthController {
     );
   }
 
-  private generateRandomNumericSuffix(length = 6): string {
+  private _generateRandomNumericSuffix(length = 6): string {
     const max = 10 ** length;
     const min = 10 ** (length - 1);
     return Math.floor(Math.random() * (max - min) + min).toString();
   }
 
-  private async createGoogleUserWithUniqueUsername(params: {
+  private async _createGoogleUserWithUniqueUsername(params: {
     username: string;
     email: string;
     googleId: string;
@@ -32,7 +32,7 @@ export class AuthController {
       const candidateUsername =
         attempt === 0
           ? username
-          : `${username}${this.generateRandomNumericSuffix(6)}`;
+          : `${username}${this._generateRandomNumericSuffix(6)}`;
 
       try {
         return await User.create({
@@ -42,7 +42,7 @@ export class AuthController {
           profilePic,
         });
       } catch (error) {
-        if (!this.isDuplicateKeyError(error)) {
+        if (!this._isDuplicateKeyError(error)) {
           throw error;
         }
 
@@ -283,7 +283,7 @@ export class AuthController {
         return res.status(409).json({ error: "Email already exists" });
       }
 
-      const user = await this.createGoogleUserWithUniqueUsername({
+      const user = await this._createGoogleUserWithUniqueUsername({
         username,
         email,
         googleId,

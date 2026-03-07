@@ -7,7 +7,7 @@ export type TokenContent = {
 };
 
 export class AuthUtils {
-  private static get secret(): string {
+  private static get _secret(): string {
     const secret = process.env.JWT_SECRET;
 
     if (!secret || secret.length < 32) {
@@ -20,13 +20,13 @@ export class AuthUtils {
   }
 
   static generateAccessToken(tokenContent: TokenContent): string {
-    const secret = this.secret;
+    const secret = this._secret;
     const exp = parseInt(process.env.JWT_EXPIRES_IN || "3600"); // 1 hour
     return jwt.sign(tokenContent, secret, { expiresIn: exp });
   }
 
   static generateRefreshToken(tokenContent: TokenContent): string {
-    const secret = this.secret;
+    const secret = this._secret;
     const exp = parseInt(process.env.JWT_REFRESH_EXPIRES_IN || "86400"); // 24 hours
     return jwt.sign(tokenContent, secret, {
       expiresIn: exp,
@@ -45,7 +45,7 @@ export class AuthUtils {
   }
 
   static verifyToken(token: string): TokenContent {
-    return jwt.verify(token, this.secret) as TokenContent;
+    return jwt.verify(token, this._secret) as TokenContent;
   }
 
   static extractTokenFromHeader(authHeader: string | undefined): string | null {
