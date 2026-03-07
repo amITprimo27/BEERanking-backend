@@ -2,7 +2,7 @@ import express, { Express } from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import swaggerUi from "swagger-ui-express";
-// import specs from "./swagger";
+import specs from "./swagger";
 import { beerRouter } from "./routes/beer.route";
 import { postRouter } from "./routes/post.routes";
 import { userRouter } from "./routes/user.route";
@@ -17,24 +17,6 @@ const intApp = () => {
     app.use(express.urlencoded({ extended: false }));
     app.use(express.json());
 
-    // Swagger UI
-    // Swagger Documentation
-    // app.use(
-    //   "/api-docs",
-    //   swaggerUi.serve,
-    //   swaggerUi.setup(specs, {
-    //     explorer: true,
-    //     customCss: ".swagger-ui .topbar { display: none }",
-    //     customSiteTitle: "TODO",
-    //   }),
-    // );
-
-    // // Swagger JSON endpoint
-    // app.get("/api-docs.json", (req, res) => {
-    //   res.setHeader("Content-Type", "application/json");
-    //   res.send(specs);
-    // });
-
     // Routes
     app.use("/uploads", express.static("public/uploads"));
 
@@ -43,6 +25,25 @@ const intApp = () => {
     apiRouter.use("/posts", postRouter);
     apiRouter.use("/users", userRouter);
     apiRouter.use("/auth", authRouter);
+
+    // Swagger UI
+    // Swagger Documentation
+    apiRouter.use(
+      "/docs",
+      swaggerUi.serve,
+      swaggerUi.setup(specs, {
+        explorer: true,
+        customCss: ".swagger-ui .topbar { display: none }",
+        customSiteTitle: "BEERanking API Docs",
+      }),
+    );
+
+    // Swagger JSON endpoint
+    apiRouter.get("/docs.json", (req, res) => {
+      res.setHeader("Content-Type", "application/json");
+      res.send(specs);
+    });
+
     app.use("/api", apiRouter);
 
     //TODO: react app static files
