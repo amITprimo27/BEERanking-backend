@@ -1,15 +1,17 @@
 import { Router } from "express";
 import { UserController } from "../controllers/user.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
+import { uploadProfilePic } from "../middlewares/multer.middleware";
 
 const router = Router();
 const userController = new UserController();
 
 /**
- * GET /api/users/:id
- * Get user by ID
+ * GET /api/users/me
+ * Get current authenticated user
+ * Requires authentication
  */
-router.get("/:id", (req, res) => userController.getById(req, res));
+router.get("/me", authMiddleware, (req, res) => userController.getMe(req, res));
 
 /**
  * PATCH /api/users/me
@@ -18,8 +20,11 @@ router.get("/:id", (req, res) => userController.getById(req, res));
  * Expects multipart/form-data or JSON body
  * Requires authentication
  */
-router.patch("/me", authMiddleware, (req, res) =>
-  userController.updateUser(req, res),
+router.patch(
+  "/me",
+  authMiddleware,
+  uploadProfilePic.single("profilePic"),
+  (req, res) => userController.updateUser(req, res),
 );
 
 export { router as userRouter };
