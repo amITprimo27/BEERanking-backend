@@ -35,6 +35,9 @@ const intApp = () => {
         explorer: true,
         customCss: ".swagger-ui .topbar { display: none }",
         customSiteTitle: "BEERanking API Docs",
+        swaggerOptions: {
+          persistAuthorization: true,
+        },
       }),
     );
 

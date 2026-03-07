@@ -71,10 +71,12 @@ const beerSchema = new Schema<IBeer>(
       required: true,
     },
     profileScores: {
+      select: false,
       type: profileScoresSchema,
       required: true,
     },
     searchBlob: {
+      select: false,
       type: String,
       required: true,
     },

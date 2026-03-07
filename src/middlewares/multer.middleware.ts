@@ -5,7 +5,7 @@ import { Request } from "express";
 
 export type FileRequest = Request & { file?: Express.Multer.File };
 
-const uploadDir = path.join(__dirname, "../../public/uploads");
+const uploadDir = path.join(process.cwd(), "public/uploads");
 
 // Ensure upload directory exists
 if (!fs.existsSync(uploadDir)) {

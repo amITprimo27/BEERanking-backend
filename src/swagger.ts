@@ -8,6 +8,15 @@ const options: swaggerJsdoc.Options = {
       version: "1.0.0",
       description: "API documentation for BEERanking application",
     },
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+        },
+      },
+    },
   },
   apis: ["./src/routes/*.ts"], // Path to the API docs
 };

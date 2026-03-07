@@ -84,12 +84,25 @@ export class UserController extends BaseController<IUser> {
 
       // Handle favoriteBeers array if provided
       if (favoriteBeers !== undefined) {
-        if (!Array.isArray(favoriteBeers)) {
+        let beersArray = favoriteBeers;
+
+        // If it's a string (from multipart/form-data), parse it as JSON
+        if (typeof favoriteBeers === "string") {
+          try {
+            beersArray = JSON.parse(favoriteBeers);
+          } catch (e) {
+            return res
+              .status(400)
+              .json({ error: "favoriteBeers must be a valid JSON array" });
+          }
+        }
+
+        if (!Array.isArray(beersArray)) {
           return res
             .status(400)
             .json({ error: "favoriteBeers must be an array" });
         }
-        updateData.favoriteBeers = favoriteBeers;
+        updateData.favoriteBeers = beersArray;
       }
 
       // Handle optional profile picture upload
