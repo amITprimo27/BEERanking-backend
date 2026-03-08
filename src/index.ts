@@ -7,6 +7,7 @@ import { beerRouter } from "./routes/beer.route";
 import { postRouter } from "./routes/post.routes";
 import { userRouter } from "./routes/user.route";
 import { authRouter } from "./routes/auth.routes";
+import { UPLOADS_DIR } from "./utils/paths.utils";
 
 const app = express();
 
@@ -18,7 +19,7 @@ const intApp = () => {
     app.use(express.json());
 
     // Routes
-    app.use("/uploads", express.static("public/uploads"));
+    app.use("/uploads", express.static(UPLOADS_DIR));
 
     const apiRouter = express.Router();
     apiRouter.use("/beers", beerRouter);
@@ -35,6 +36,9 @@ const intApp = () => {
         explorer: true,
         customCss: ".swagger-ui .topbar { display: none }",
         customSiteTitle: "BEERanking API Docs",
+        swaggerOptions: {
+          persistAuthorization: true,
+        },
       }),
     );
 

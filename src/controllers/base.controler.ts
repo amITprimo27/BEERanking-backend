@@ -15,7 +15,13 @@ export class BaseController<T> {
     if (error instanceof mongoose.Error.CastError) return 400;
     if (error.name === "ValidationError") return 400;
     if (error.name === "CastError") return 400;
+    if (error.code === 11000) return 409; // Duplicate key error
     return 500;
+  }
+
+  // Protected helper to fetch a document by ID (can be overridden in subclasses)
+  protected async fetchById(id: string) {
+    return this.model.findById(id);
   }
 
   async get(req: Request, res: Response) {
@@ -60,7 +66,7 @@ export class BaseController<T> {
     }
 
     try {
-      const data = await this.model.findById(id);
+      const data = await this.fetchById(id);
       if (!data) {
         return res.status(404).json({ error: "Data not found" });
       }

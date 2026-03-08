@@ -5,8 +5,8 @@ import { connectTestDb, clearTestDb, disconnectTestDb } from "../helpers/db";
 import { User } from "../../models/user.model";
 import { Beer } from "../../models/beer.model";
 import { AuthUtils } from "../../utils/auth.utils";
+import { UPLOADS_DIR, toPublicAbsolutePath } from "../../utils/paths.utils";
 import * as fs from "fs";
-import * as path from "path";
 
 describe("User routes integration", () => {
   const app = express();
@@ -16,8 +16,11 @@ describe("User routes integration", () => {
   let token = "";
   let userId = "";
   let beerId = "";
-  const uploadDir = path.join(__dirname, "../../../public/uploads");
+  const uploadDir = UPLOADS_DIR;
   const uploadedFiles: string[] = [];
+
+  const getUploadedFileAbsolutePath = (profilePicPath: string) =>
+    toPublicAbsolutePath(profilePicPath);
 
   beforeAll(async () => {
     await connectTestDb();
@@ -77,9 +80,11 @@ describe("User routes integration", () => {
     token = AuthUtils.generateAccessToken({ userId });
   });
 
-  describe("GET /api/users/:id", () => {
-    it("returns user from DB by ID", async () => {
-      const response = await request(app).get(`/api/users/${userId}`);
+  describe("GET /api/users/me", () => {
+    it("returns current authenticated user", async () => {
+      const response = await request(app)
+        .get("/api/users/me")
+        .set("Authorization", `Bearer ${token}`);
 
       expect(response.status).toBe(200);
       expect(response.body._id).toBe(userId);
@@ -88,20 +93,11 @@ describe("User routes integration", () => {
       expect(response.body.password).toBeUndefined(); // Password should not be returned
     });
 
-    it("returns 400 for invalid user ID format", async () => {
-      const response = await request(app).get("/api/users/invalid-id");
+    it("returns 401 without authentication token", async () => {
+      const response = await request(app).get("/api/users/me");
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toBe("Invalid ID format");
-    });
-
-    it("returns 404 for non-existent user ID", async () => {
-      const fakeId = "507f1f77bcf86cd799439011"; // Valid ObjectId but doesn't exist
-
-      const response = await request(app).get(`/api/users/${fakeId}`);
-
-      expect(response.status).toBe(404);
-      expect(response.body.error).toBe("Data not found");
+      expect(response.status).toBe(401);
+      expect(response.body.error).toBe("Unauthorized");
     });
 
     it("returns user with favorite beers populated", async () => {
@@ -109,7 +105,9 @@ describe("User routes integration", () => {
         $push: { favoriteBeers: beerId },
       });
 
-      const response = await request(app).get(`/api/users/${userId}`);
+      const response = await request(app)
+        .get("/api/users/me")
+        .set("Authorization", `Bearer ${token}`);
 
       expect(response.status).toBe(200);
       expect(response.body.favoriteBeers).toBeDefined();
@@ -127,6 +125,16 @@ describe("User routes integration", () => {
       expect(response.body.error).toBe("Unauthorized");
     });
 
+    it("returns 400 when no fields are provided", async () => {
+      const response = await request(app)
+        .patch("/api/users/me")
+        .set("Authorization", `Bearer ${token}`)
+        .send({});
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe("No fields to update provided");
+    });
+
     it("updates username only", async () => {
       const response = await request(app)
         .patch("/api/users/me")
@@ -134,17 +142,37 @@ describe("User routes integration", () => {
         .send({ username: "updated-username" });
 
       expect(response.status).toBe(200);
-      expect(response.body.message).toBe("User updated");
+
+      const updatedUser = await User.findById(userId);
+      expect(updatedUser?.username).toBe("updated-username");
     });
 
-    it("updates email only", async () => {
+    it("returns 400 for username shorter than 3 characters", async () => {
+      const response = await request(app)
+        .patch("/api/users/me")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ username: "ab" });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe(
+        "Username must be at least 3 characters",
+      );
+
+      const unchangedUser = await User.findById(userId);
+      expect(unchangedUser?.username).toBe("user-route");
+    });
+
+    it("prevents email change", async () => {
       const response = await request(app)
         .patch("/api/users/me")
         .set("Authorization", `Bearer ${token}`)
         .send({ email: "newemail@test.com" });
 
-      expect(response.status).toBe(200);
-      expect(response.body.message).toBe("User updated");
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBeDefined();
+
+      const user = await User.findById(userId);
+      expect(user?.email).toBe("user-route@test.com");
     });
 
     it("updates multiple fields at once", async () => {
@@ -153,11 +181,10 @@ describe("User routes integration", () => {
         .set("Authorization", `Bearer ${token}`)
         .send({
           username: "multi-update",
-          email: "multi@test.com",
+          favoriteBeers: [beerId],
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.message).toBe("User updated");
     });
 
     it("updates favorite beers array", async () => {
@@ -169,7 +196,37 @@ describe("User routes integration", () => {
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.message).toBe("User updated");
+
+      expect(Array.isArray(response.body.user.favoriteBeers)).toBe(true);
+      expect(response.body.user.favoriteBeers[0]).toBeDefined();
+      expect(response.body.user.favoriteBeers[0]._id.toString()).toBe(beerId);
+
+      const userWithFavorites =
+        await User.findById(userId).populate("favoriteBeers");
+      expect(userWithFavorites?.favoriteBeers).toHaveLength(1);
+    });
+
+    it("returns 400 when favoriteBeers is not an array", async () => {
+      const response = await request(app)
+        .patch("/api/users/me")
+        .set("Authorization", `Bearer ${token}`)
+        .send({
+          favoriteBeers: "not-an-array",
+        });
+
+      expect(response.status).toBe(400);
+    });
+
+    it("returns 400 when favoriteBeers contains invalid ObjectId", async () => {
+      const response = await request(app)
+        .patch("/api/users/me")
+        .set("Authorization", `Bearer ${token}`)
+        .send({
+          favoriteBeers: ["invalid-object-id"],
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBeDefined();
     });
 
     it("uploads profile picture with multipart/form-data", async () => {
@@ -179,7 +236,6 @@ describe("User routes integration", () => {
         .attach("profilePic", Buffer.from("profile image data"), "profile.jpg");
 
       expect(response.status).toBe(200);
-      expect(response.body.message).toBe("User updated");
 
       // Verify the user has a profile picture path in DB
       const updatedUser = await User.findById(userId);
@@ -187,11 +243,7 @@ describe("User routes integration", () => {
       expect(updatedUser?.profilePic).toContain("uploads/");
 
       // Verify the file exists in public/uploads
-      const imagePath = path.join(
-        __dirname,
-        "../../../public",
-        updatedUser!.profilePic!,
-      );
+      const imagePath = getUploadedFileAbsolutePath(updatedUser!.profilePic!);
       expect(fs.existsSync(imagePath)).toBe(true);
       uploadedFiles.push(imagePath); // Track for cleanup
     });
@@ -201,11 +253,9 @@ describe("User routes integration", () => {
         .patch("/api/users/me")
         .set("Authorization", `Bearer ${token}`)
         .field("username", "new-name")
-        .field("email", "new-email@test.com")
         .attach("profilePic", Buffer.from("profile image data"), "profile.jpg");
 
       expect(response.status).toBe(200);
-      expect(response.body.message).toBe("User updated");
 
       // Verify the user has updated fields AND profile picture
       const updatedUser = await User.findById(userId);
@@ -213,11 +263,7 @@ describe("User routes integration", () => {
       expect(updatedUser?.profilePic).toContain("uploads/");
 
       // Verify the file exists in public/uploads
-      const imagePath = path.join(
-        __dirname,
-        "../../../public",
-        updatedUser!.profilePic!,
-      );
+      const imagePath = getUploadedFileAbsolutePath(updatedUser!.profilePic!);
       expect(fs.existsSync(imagePath)).toBe(true);
       uploadedFiles.push(imagePath); // Track for cleanup
     });
@@ -233,7 +279,6 @@ describe("User routes integration", () => {
         .send({ favoriteBeers: [] });
 
       expect(response.status).toBe(200);
-      expect(response.body.message).toBe("User updated");
     });
 
     it("does not include password in PATCH response", async () => {
@@ -244,19 +289,6 @@ describe("User routes integration", () => {
 
       expect(response.status).toBe(200);
       expect(response.body.password).toBeUndefined();
-    });
-
-    it("prevents email change", async () => {
-      const response = await request(app)
-        .patch("/api/users/me")
-        .set("Authorization", `Bearer ${token}`)
-        .send({ email: "newemail@test.com" });
-
-      expect(response.status).toBe(200);
-
-      const user = await User.findById(userId);
-
-      expect(user?.email).toBe("user-route@test.com"); // Email should not change
     });
 
     it("returns 409 for duplicate username", async () => {
@@ -279,6 +311,79 @@ describe("User routes integration", () => {
       // Verify username unchanged
       const user = await User.findById(userId);
       expect(user?.username).toBe("user-route");
+    });
+
+    describe("file cleanup", () => {
+      it("deletes uploaded file when request fails validation", async () => {
+        const filesBefore = fs.readdirSync(uploadDir).sort();
+
+        const response = await request(app)
+          .patch("/api/users/me")
+          .set("Authorization", `Bearer ${token}`)
+          .field("username", "ab")
+          .attach("profilePic", Buffer.from("profile image data"), "bad.jpg");
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toBe(
+          "Username must be at least 3 characters",
+        );
+
+        const filesAfter = fs.readdirSync(uploadDir).sort();
+        expect(filesAfter).toEqual(filesBefore);
+      });
+
+      it("deletes uploaded file when request fails with 409", async () => {
+        await User.create({
+          username: "taken-user",
+          email: "taken@test.com",
+          password: "secret",
+        });
+
+        const filesBefore = fs.readdirSync(uploadDir).sort();
+
+        const response = await request(app)
+          .patch("/api/users/me")
+          .set("Authorization", `Bearer ${token}`)
+          .field("username", "taken-user")
+          .attach("profilePic", Buffer.from("profile image data"), "dup.jpg");
+
+        expect(response.status).toBe(409);
+
+        const filesAfter = fs.readdirSync(uploadDir).sort();
+        expect(filesAfter).toEqual(filesBefore);
+      });
+
+      it("deletes old profile picture when replacing it", async () => {
+        const firstUpload = await request(app)
+          .patch("/api/users/me")
+          .set("Authorization", `Bearer ${token}`)
+          .attach("profilePic", Buffer.from("first image"), "first.jpg");
+
+        expect(firstUpload.status).toBe(200);
+
+        const userAfterFirst = await User.findById(userId);
+        const firstImagePath = getUploadedFileAbsolutePath(
+          userAfterFirst!.profilePic!,
+        );
+        expect(fs.existsSync(firstImagePath)).toBe(true);
+
+        const secondUpload = await request(app)
+          .patch("/api/users/me")
+          .set("Authorization", `Bearer ${token}`)
+          .attach("profilePic", Buffer.from("second image"), "second.jpg");
+
+        expect(secondUpload.status).toBe(200);
+
+        const userAfterSecond = await User.findById(userId);
+        const secondImagePath = getUploadedFileAbsolutePath(
+          userAfterSecond!.profilePic!,
+        );
+
+        expect(fs.existsSync(firstImagePath)).toBe(false);
+        expect(fs.existsSync(secondImagePath)).toBe(true);
+
+        uploadedFiles.push(secondImagePath);
+      });
     });
   });
 });

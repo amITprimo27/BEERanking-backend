@@ -6,8 +6,8 @@ import { User } from "../../models/user.model";
 import { Beer } from "../../models/beer.model";
 import { Post } from "../../models/post.model";
 import { AuthUtils } from "../../utils/auth.utils";
+import { UPLOADS_DIR, toPublicAbsolutePath } from "../../utils/paths.utils";
 import * as fs from "fs";
-import * as path from "path";
 
 describe("Post routes integration", () => {
   const app = express();
@@ -17,7 +17,7 @@ describe("Post routes integration", () => {
   let token = "";
   let userId = "";
   let beerId = "";
-  const uploadDir = path.join(__dirname, "../../../public/uploads");
+  const uploadDir = UPLOADS_DIR;
   const uploadedFiles: string[] = [];
 
   beforeAll(async () => {
@@ -97,11 +97,7 @@ describe("Post routes integration", () => {
     expect(createdPost?.image).toContain("uploads/");
 
     // Verify the file exists in public/uploads
-    const imagePath = path.join(
-      __dirname,
-      "../../../public",
-      createdPost!.image,
-    );
+    const imagePath = toPublicAbsolutePath(createdPost!.image);
     expect(fs.existsSync(imagePath)).toBe(true);
     uploadedFiles.push(imagePath); // Track for cleanup
   });
@@ -325,11 +321,7 @@ describe("Post routes integration", () => {
     expect(updatedPost?.image).toContain("uploads/");
 
     // Verify the new file exists in public/uploads
-    const newImagePath = path.join(
-      __dirname,
-      "../../../public",
-      updatedPost!.image,
-    );
+    const newImagePath = toPublicAbsolutePath(updatedPost!.image);
     expect(fs.existsSync(newImagePath)).toBe(true);
     uploadedFiles.push(newImagePath); // Track for cleanup
   });
@@ -409,7 +401,7 @@ describe("Post routes integration", () => {
     expect(postExistsAfter).toBeNull();
 
     // Verify the associated image file was also deleted
-    const imagePath = path.join(__dirname, "../../../public", post.image);
+    const imagePath = toPublicAbsolutePath(post.image);
     expect(fs.existsSync(imagePath)).toBe(false);
   });
 
