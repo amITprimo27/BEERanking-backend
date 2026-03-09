@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { Post, IPost } from "../models/post.model";
-import { BaseController } from "./base.controler";
+import { BaseController } from "./base.controller";
 import { AuthRequest } from "../middlewares/auth.middleware";
 import { FileRequest } from "../middlewares/multer.middleware";
 import mongoose from "mongoose";
@@ -44,17 +44,8 @@ export class PostController extends BaseController<IPost> {
   //#endregion
 
   //#region Delete hooks
-
-  protected override async fetchForDelete(id: string) {
-    return Post.findById(id);
-  }
-
   protected override async authorizeDelete(req: AuthRequest, entity: IPost) {
-    const userId = req.user?._id;
-
-    if (!userId) {
-      this.throwHttpError(401, "Unauthorized");
-    }
+    const userId = this.requireAuthenticatedUser(req);
 
     if (entity.user.toString() !== userId) {
       this.throwHttpError(403, "Forbidden");
@@ -137,27 +128,18 @@ export class PostController extends BaseController<IPost> {
   //#region Update hooks
   protected override async authorizeUpdate(
     req: AuthRequest,
-    id: string,
+    entity: IPost,
   ): Promise<void> {
-    const userId = req.user?._id;
+    const userId = this.requireAuthenticatedUser(req);
 
-    if (!userId) {
-      this.throwHttpError(401, "Unauthorized");
-    }
-
-    const post = await Post.findById(id);
-    if (!post) {
-      this.throwHttpError(404, "Data not found");
-    }
-
-    if (post.user.toString() !== userId) {
+    if (entity.user.toString() !== userId) {
       this.throwHttpError(403, "Forbidden");
     }
   }
 
   protected override async validatePatch(
     req: AuthRequest & FileRequest,
-    _id: string,
+    _entity: IPost,
   ): Promise<void> {
     const { rating, beer, description } = req.body;
 

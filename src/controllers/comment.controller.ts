@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { Comment, IComment } from "../models/comment.model";
 import { Post } from "../models/post.model";
-import { BaseController } from "./base.controler";
+import { BaseController } from "./base.controller";
 
 export class CommentController extends BaseController<IComment> {
   constructor() {

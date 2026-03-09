@@ -41,6 +41,14 @@ export class BaseController<T> {
 
     return userId;
   }
+
+  private parseQueryInt(value: unknown, defaultValue: number): number {
+    if (typeof value === "string") {
+      const parsed = parseInt(value);
+      return isNaN(parsed) ? defaultValue : parsed;
+    }
+    return defaultValue;
+  }
   //#endregion
 
   //#region Read (GET)
@@ -58,8 +66,8 @@ export class BaseController<T> {
     additionalFilter: mongoose.FilterQuery<T> = {},
   ) {
     try {
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 10;
+      const page = this.parseQueryInt(req.query.page, 1);
+      const limit = this.parseQueryInt(req.query.limit, 10);
       const skip = (page - 1) * limit;
 
       const { page: _, limit: __, ...queryFilter } = req.query;
@@ -214,11 +222,17 @@ export class BaseController<T> {
   //#endregion
 
   //#region Update (PATCH)
-  protected async authorizeUpdate(_req: Request, _id: string): Promise<void> {
+  protected async authorizeUpdate(
+    _req: Request,
+    _entity: T,
+  ): Promise<void> {
     this.requireAuthenticatedUser(_req);
   }
 
-  protected async validatePatch(_req: Request, _id: string): Promise<void> {
+  protected async validatePatch(
+    _req: Request,
+    _entity: T,
+  ): Promise<void> {
     // no-op by default
   }
 
@@ -264,8 +278,8 @@ export class BaseController<T> {
         return res.status(404).json({ error: "Data not found" });
       }
 
-      await this.authorizeUpdate(req, id);
-      await this.validatePatch(req, id);
+      await this.authorizeUpdate(req, entity);
+      await this.validatePatch(req, entity);
       await this.beforePatch(req, id, entity);
 
       const patchData = await this.buildPatchData(req, id);
