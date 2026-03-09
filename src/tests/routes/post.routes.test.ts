@@ -301,7 +301,7 @@ describe("Post routes integration", () => {
     expect(likeResponse.body.message).toBe("Post liked");
     expect(likeResponse.body.likeCount).toBe(1);
 
-    const likedPost = await Post.findById(post._id);
+    const likedPost = await Post.findById(post._id).select("+likes");
     expect(likedPost?.likes.length).toBe(1);
     expect(likedPost?.likes[0].toString()).toBe(userId);
 
@@ -315,7 +315,7 @@ describe("Post routes integration", () => {
     expect(unlikeResponse.body.message).toBe("Post unliked");
     expect(unlikeResponse.body.likeCount).toBe(0);
 
-    const unlikedPost = await Post.findById(post._id);
+    const unlikedPost = await Post.findById(post._id).select("+likes");
     expect(unlikedPost?.likes.length).toBe(0);
   });
 

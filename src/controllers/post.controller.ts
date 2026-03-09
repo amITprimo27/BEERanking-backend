@@ -24,7 +24,7 @@ export class PostController extends BaseController<IPost> {
    */
   protected override async fetchById(id: string) {
     return Post.findById(id)
-      .populate("user", "username email profilePic")
+      .populate("user", "username profilePic")
       .populate("beer")
       .populate("commentCount");
   }
@@ -37,7 +37,7 @@ export class PostController extends BaseController<IPost> {
   ) {
     return query
       .sort({ createdAt: -1 })
-      .populate("user", "username email profilePic")
+      .populate("user", "username profilePic")
       .populate("beer")
       .populate("commentCount");
   }
@@ -61,6 +61,12 @@ export class PostController extends BaseController<IPost> {
     }
 
     await Comment.deleteMany({ post: entity._id });
+  }
+
+  protected override async formatDeleteResponse(
+    _deleted: IPost,
+  ): Promise<unknown> {
+    return { message: "Post deleted" };
   }
   //#endregion
 
@@ -118,10 +124,13 @@ export class PostController extends BaseController<IPost> {
   /**
    * Format create response
    */
-  protected override async formatCreateResponse(
-    created: IPost,
-  ): Promise<unknown> {
-    return { message: "Post added", data: created };
+  protected override async formatCreateResponse(created: IPost) {
+    const populatedCreated = await this.fetchById(created._id.toString());
+
+    return {
+      message: "Post added",
+      data: populatedCreated,
+    };
   }
   //#endregion
 
@@ -231,10 +240,10 @@ export class PostController extends BaseController<IPost> {
     }
   }
 
-  protected override async formatPatchResponse(
-    updated: IPost,
-  ): Promise<unknown> {
-    return { message: "Post updated", data: updated };
+  protected override async formatPatchResponse(updated: IPost) {
+    const populatedUpdated = await this.fetchById(updated._id.toString());
+
+    return { message: "Post updated", data: populatedUpdated };
   }
   //#endregion
 
@@ -254,7 +263,7 @@ export class PostController extends BaseController<IPost> {
     try {
       const userId = this.requireAuthenticatedUser(req);
 
-      const post = await Post.findById(postId).select("likes");
+      const post = await Post.findById(postId).select("+likes");
       if (!post) {
         return res.status(404).json({ error: "Data not found" });
       }
@@ -264,8 +273,14 @@ export class PostController extends BaseController<IPost> {
       });
 
       const update = alreadyLiked
-        ? { $pull: { likes: new mongoose.Types.ObjectId(userId) } }
-        : { $addToSet: { likes: new mongoose.Types.ObjectId(userId) } };
+        ? {
+            $pull: { likes: new mongoose.Types.ObjectId(userId) },
+            $inc: { likesCount: -1 },
+          }
+        : {
+            $addToSet: { likes: new mongoose.Types.ObjectId(userId) },
+            $inc: { likesCount: 1 },
+          };
 
       const updatedPost = await Post.findByIdAndUpdate(postId, update, {
         new: true,
@@ -278,7 +293,7 @@ export class PostController extends BaseController<IPost> {
       return res.json({
         message: alreadyLiked ? "Post unliked" : "Post liked",
         liked: !alreadyLiked,
-        likeCount: updatedPost.likes.length,
+        likeCount: updatedPost.likesCount,
       });
     } catch (error) {
       const status = this.getErrorStatus(error);

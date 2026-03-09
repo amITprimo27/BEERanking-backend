@@ -179,6 +179,10 @@ export class BaseController<T> {
     // no-op by default
   }
 
+  protected async formatDeleteResponse(deleted: T): Promise<unknown> {
+    return deleted;
+  }
+
   protected async deleteById(id: string) {
     return this.model.findByIdAndDelete(id);
   }
@@ -206,7 +210,9 @@ export class BaseController<T> {
 
       await this.afterDelete(req, entity);
 
-      return res.json(response);
+      const responseBody = await this.formatDeleteResponse(response);
+
+      return res.json(responseBody);
     } catch (error) {
       if (error instanceof ControllerHttpError) {
         return res.status(error.status).json({ error: error.message });
