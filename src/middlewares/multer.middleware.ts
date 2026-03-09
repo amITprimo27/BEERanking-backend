@@ -51,7 +51,7 @@ const upload = multer({
 /**
  * Middleware wrapper that auto-cleans up uploaded files on error responses
  */
-export const uploadProfilePic = {
+export const uploadImage = {
   single: (fieldName: string) => {
     return [
       upload.single(fieldName),

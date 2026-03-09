@@ -1,15 +1,24 @@
 import { Request, Response } from "express";
 import mongoose from "mongoose";
+import { AuthRequest } from "../middlewares/auth.middleware";
+
+class ControllerHttpError extends Error {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
 
 export class BaseController<T> {
   constructor(protected model: mongoose.Model<T>) {}
 
-  // Helper to validate MongoDB ObjectId
+  //#region Common helpers
   protected isValidObjectId(id: string): boolean {
     return mongoose.Types.ObjectId.isValid(id);
   }
 
-  // Helper to determine error status code
   protected getErrorStatus(error: any): number {
     if (error instanceof mongoose.Error.ValidationError) return 400;
     if (error instanceof mongoose.Error.CastError) return 400;
@@ -19,25 +28,47 @@ export class BaseController<T> {
     return 500;
   }
 
-  // Protected helper to fetch a document by ID (can be overridden in subclasses)
+  protected throwHttpError(status: number, message: string): never {
+    throw new ControllerHttpError(status, message);
+  }
+
+  protected requireAuthenticatedUser(req: AuthRequest): string {
+    const userId = req.user?._id;
+
+    if (!userId) {
+      this.throwHttpError(401, "Unauthorized");
+    }
+
+    return userId;
+  }
+  //#endregion
+
+  //#region Read (GET)
   protected async fetchById(id: string) {
     return this.model.findById(id);
   }
 
-  async get(req: Request, res: Response) {
+  protected customizeQuery(query: mongoose.Query<Array<T>, T>) {
+    return query;
+  }
+
+  protected async getPaginated(
+    req: Request,
+    res: Response,
+    additionalFilter: mongoose.FilterQuery<T> = {},
+  ) {
     try {
-      // Optional pagination support
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
       const skip = (page - 1) * limit;
 
-      // Remove pagination params from filter
       const { page: _, limit: __, ...queryFilter } = req.query;
+      const combinedFilter = { ...queryFilter, ...additionalFilter };
 
-      const data = await this.model.find(queryFilter).limit(limit).skip(skip);
+      const query = this.model.find(combinedFilter).limit(limit).skip(skip);
+      const data = await this.customizeQuery(query);
 
-      // Include total count for pagination
-      const total = await this.model.countDocuments(queryFilter);
+      const total = await this.model.countDocuments(combinedFilter);
 
       res.json({
         data,
@@ -57,10 +88,13 @@ export class BaseController<T> {
     }
   }
 
+  async get(req: Request, res: Response) {
+    return this.getPaginated(req, res);
+  }
+
   async getById(req: Request, res: Response) {
     const id = req.params.id;
 
-    // Validate ObjectId format first
     if (!this.isValidObjectId(id)) {
       return res.status(400).json({ error: "Invalid ID format" });
     }
@@ -79,19 +113,66 @@ export class BaseController<T> {
       });
     }
   }
+  //#endregion
+
+  //#region Create (POST)
+  protected async authorizeCreate(req: Request): Promise<void> {
+    this.requireAuthenticatedUser(req);
+  }
+
+  protected async validateCreate(_req: Request): Promise<void> {}
+
+  protected async buildCreateData(req: Request): Promise<Partial<T>> {
+    return req.body;
+  }
+
+  protected async formatCreateResponse(created: T): Promise<unknown> {
+    return created;
+  }
 
   async post(req: Request, res: Response) {
-    const obj = req.body;
     try {
-      const response = await this.model.create(obj);
-      res.status(201).json(response);
+      await this.authorizeCreate(req);
+      await this.validateCreate(req);
+
+      const createData = await this.buildCreateData(req);
+      const created = await this.model.create(createData);
+      const responseBody = await this.formatCreateResponse(created);
+
+      return res.status(201).json(responseBody);
     } catch (error) {
+      if (error instanceof ControllerHttpError) {
+        return res.status(error.status).json({ error: error.message });
+      }
+
       const status = this.getErrorStatus(error);
-      res.status(status).json({
+      return res.status(status).json({
         error:
           error instanceof Error ? error.message : "An unknown error occurred",
       });
     }
+  }
+  //#endregion
+
+  //#region Delete (DELETE)
+  protected async fetchForDelete(id: string) {
+    return this.model.findById(id);
+  }
+
+  protected async authorizeDelete(req: Request, _entity: T): Promise<void> {
+    this.requireAuthenticatedUser(req);
+  }
+
+  protected async beforeDelete(_req: Request, _entity: T): Promise<void> {
+    // no-op by default
+  }
+
+  protected async afterDelete(_req: Request, _entity: T): Promise<void> {
+    // no-op by default
+  }
+
+  protected async deleteById(id: string) {
+    return this.model.findByIdAndDelete(id);
   }
 
   async del(req: Request, res: Response) {
@@ -102,61 +183,96 @@ export class BaseController<T> {
     }
 
     try {
-      const response = await this.model.findByIdAndDelete(id);
+      const entity = await this.fetchForDelete(id);
+      if (!entity) {
+        return res.status(404).json({ error: "Data not found" });
+      }
+
+      await this.authorizeDelete(req, entity);
+      await this.beforeDelete(req, entity);
+
+      const response = await this.deleteById(id);
       if (!response) {
         return res.status(404).json({ error: "Data not found" });
       }
-      res.json(response);
+
+      await this.afterDelete(req, entity);
+
+      return res.json(response);
     } catch (error) {
+      if (error instanceof ControllerHttpError) {
+        return res.status(error.status).json({ error: error.message });
+      }
+
       const status = this.getErrorStatus(error);
-      res.status(status).json({
+      return res.status(status).json({
         error:
           error instanceof Error ? error.message : "An unknown error occurred",
       });
     }
   }
+  //#endregion
 
-  // PUT - full document replacement
-  async put(req: Request, res: Response) {
-    const id = req.params.id;
-    const obj = req.body;
+  //#region Update (PATCH)
+  protected async authorizeUpdate(_req: Request, _id: string): Promise<void> {
+    this.requireAuthenticatedUser(_req);
+  }
 
-    if (!this.isValidObjectId(id)) {
-      return res.status(400).json({ error: "Invalid ID format" });
-    }
+  protected async validatePatch(_req: Request, _id: string): Promise<void> {
+    // no-op by default
+  }
 
-    try {
-      const response = await this.model.findByIdAndUpdate(id, obj, {
-        new: true,
-        overwrite: true, // Replace entire document
-        runValidators: true, // Run schema validators
-      });
-      if (!response) {
-        return res.status(404).json({ error: "Data not found" });
-      }
-      res.json(response);
-    } catch (error) {
-      const status = this.getErrorStatus(error);
-      res.status(status).json({
-        error:
-          error instanceof Error ? error.message : "An unknown error occurred",
-      });
-    }
+  protected async beforePatch(
+    _req: Request,
+    _id: string,
+    _entity: T,
+  ): Promise<void> {
+    // no-op by default
+  }
+
+  protected async buildPatchData(
+    _req: Request,
+    _id: string,
+  ): Promise<Partial<T>> {
+    return _req.body;
+  }
+
+  protected async afterPatch(
+    _req: Request,
+    _oldEntity: T,
+    _updatedEntity: T,
+  ): Promise<void> {
+    // no-op by default
+  }
+
+  protected async formatPatchResponse(updated: T): Promise<unknown> {
+    return updated;
   }
 
   // PATCH - partial update
   async patch(req: Request, res: Response) {
     const id = req.params.id;
-    const obj = req.body;
 
     if (!this.isValidObjectId(id)) {
       return res.status(400).json({ error: "Invalid ID format" });
     }
 
     try {
+      // Fetch entity before update to pass to hooks
+      const entity = await this.model.findById(id);
+      if (!entity) {
+        return res.status(404).json({ error: "Data not found" });
+      }
+
+      await this.authorizeUpdate(req, id);
+      await this.validatePatch(req, id);
+      await this.beforePatch(req, id, entity);
+
+      const patchData = await this.buildPatchData(req, id);
+
       const response = await this.model.findByIdAndUpdate(
         id,
-        { $set: obj },
+        { $set: patchData },
         {
           new: true,
           runValidators: true, // Run schema validators
@@ -165,13 +281,22 @@ export class BaseController<T> {
       if (!response) {
         return res.status(404).json({ error: "Data not found" });
       }
-      res.json(response);
+
+      await this.afterPatch(req, entity, response);
+
+      const responseBody = await this.formatPatchResponse(response);
+      return res.json(responseBody);
     } catch (error) {
+      if (error instanceof ControllerHttpError) {
+        return res.status(error.status).json({ error: error.message });
+      }
+
       const status = this.getErrorStatus(error);
-      res.status(status).json({
+      return res.status(status).json({
         error:
           error instanceof Error ? error.message : "An unknown error occurred",
       });
     }
   }
+  //#endregion
 }

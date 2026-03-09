@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { PostController } from "../controllers/post.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
+import { uploadImage } from "../middlewares/multer.middleware";
 import { commentRouter } from "./comment.routes";
 
 const router = Router();
@@ -11,7 +12,7 @@ const postController = new PostController();
  * Get all posts with pagination
  * Query params: page, limit
  */
-router.get("/", (req, res) => postController.getAllPosts(req, res));
+router.get("/", (req, res) => postController.get(req, res));
 
 /**
  * GET /api/posts/me
@@ -27,16 +28,10 @@ router.get("/me", authMiddleware, (req, res) =>
  * GET /api/posts/:id
  * Get single post by ID
  */
-router.get("/:id", (req, res) => postController.getPostById(req, res));
+router.get("/:id", (req, res) => postController.getById(req, res));
 
-/**
- * POST /api/posts
- * Add new post with image upload
- * Expects multipart/form-data with image file
- * Requires authentication
- */
-router.post("/", authMiddleware, (req, res) =>
-  postController.addPost(req, res),
+router.post("/", authMiddleware, ...uploadImage.single("image"), (req, res) =>
+  postController.post(req, res),
 );
 
 /**
@@ -45,8 +40,11 @@ router.post("/", authMiddleware, (req, res) =>
  * Expects multipart/form-data or JSON body
  * Requires authentication
  */
-router.patch("/:id", authMiddleware, (req, res) =>
-  postController.updatePost(req, res),
+router.patch(
+  "/:id",
+  authMiddleware,
+  ...uploadImage.single("image"),
+  (req, res) => postController.patch(req, res),
 );
 
 /**
@@ -55,7 +53,7 @@ router.patch("/:id", authMiddleware, (req, res) =>
  * Requires authentication
  */
 router.delete("/:id", authMiddleware, (req, res) =>
-  postController.deletePost(req, res),
+  postController.del(req, res),
 );
 
 /**

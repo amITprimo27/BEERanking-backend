@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { UserController } from "../controllers/user.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
-import { uploadProfilePic } from "../middlewares/multer.middleware";
+import { uploadImage } from "../middlewares/multer.middleware";
 
 const router = Router();
 const userController = new UserController();
@@ -84,7 +84,7 @@ router.get("/me", authMiddleware, (req, res) => userController.getMe(req, res));
 router.patch(
   "/me",
   authMiddleware,
-  ...uploadProfilePic.single("profilePic"),
+  ...uploadImage.single("profilePic"),
   (req: Request, res: Response) => userController.updateUser(req, res),
 );
 

@@ -10,6 +10,7 @@ export interface IPost extends Document {
   createdAt: Date;
   updatedAt: Date;
   likeCount: number; // Virtual field
+  commentCount: number; // Virtual field
 }
 
 const postSchema = new Schema<IPost>(
@@ -54,6 +55,14 @@ const postSchema = new Schema<IPost>(
 // Virtual field for like count
 postSchema.virtual("likeCount").get(function () {
   return this.likes.length;
+});
+
+// Virtual populate for comment count
+postSchema.virtual("commentCount", {
+  ref: "Comment",
+  localField: "_id",
+  foreignField: "post",
+  count: true,
 });
 
 // Ensure virtuals are included in JSON/Object output
