@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { Beer, IBeer } from "../models/beer.model";
-import { BaseController } from "./base.controler";
+import { BaseController } from "./base.controller";
 
 export class BeerController extends BaseController<IBeer> {
   constructor() {

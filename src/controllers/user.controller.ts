@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { User, IUser } from "../models/user.model";
-import { BaseController } from "./base.controler";
+import { BaseController } from "./base.controller";
 import { AuthRequest } from "../middlewares/auth.middleware";
 import * as fs from "fs";
 import { FileRequest } from "../middlewares/multer.middleware";

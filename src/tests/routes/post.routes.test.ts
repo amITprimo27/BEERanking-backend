@@ -5,6 +5,7 @@ import { connectTestDb, clearTestDb, disconnectTestDb } from "../helpers/db";
 import { User } from "../../models/user.model";
 import { Beer } from "../../models/beer.model";
 import { Post } from "../../models/post.model";
+import { Comment } from "../../models/comment.model";
 import { AuthUtils } from "../../utils/auth.utils";
 import { UPLOADS_DIR, toPublicAbsolutePath } from "../../utils/paths.utils";
 import * as fs from "fs";
@@ -17,6 +18,8 @@ describe("Post routes integration", () => {
   let token = "";
   let userId = "";
   let beerId = "";
+  let otherUserId = "";
+  let otherToken = "";
   const uploadDir = UPLOADS_DIR;
   const uploadedFiles: string[] = [];
 
@@ -26,28 +29,17 @@ describe("Post routes integration", () => {
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
-  });
 
-  afterAll(async () => {
-    await disconnectTestDb();
-  });
-
-  afterEach(() => {
-    // Clean up uploaded files after each test
-    uploadedFiles.forEach((filePath) => {
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    });
-    uploadedFiles.length = 0; // Clear the array
-  });
-
-  beforeEach(async () => {
-    await clearTestDb();
-
+    // Create users and beer once for all tests (avoid expensive bcrypt hashing on every test)
     const user = await User.create({
       username: "post-user",
       email: "post-user@test.com",
+      password: "secret",
+    });
+
+    const otherUser = await User.create({
+      username: "other-user",
+      email: "other@test.com",
       password: "secret",
     });
 
@@ -76,6 +68,29 @@ describe("Post routes integration", () => {
     userId = user._id.toString();
     beerId = beer._id.toString();
     token = AuthUtils.generateAccessToken({ userId });
+
+    otherUserId = otherUser._id.toString();
+    otherToken = AuthUtils.generateAccessToken({ userId: otherUserId });
+  });
+
+  afterAll(async () => {
+    await disconnectTestDb();
+  });
+
+  afterEach(() => {
+    // Clean up uploaded files after each test
+    uploadedFiles.forEach((filePath) => {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    });
+    uploadedFiles.length = 0; // Clear the array
+  });
+
+  beforeEach(async () => {
+    // Only clear posts and comments between tests, keep user/beer for performance
+    await Post.deleteMany({});
+    await Comment.deleteMany({});
   });
 
   it("POST /api/posts creates post in DB with image file", async () => {
@@ -168,13 +183,6 @@ describe("Post routes integration", () => {
   });
 
   it("GET /api/posts/me returns only current user's posts", async () => {
-    // Create another user
-    const otherUser = await User.create({
-      username: "other-user",
-      email: "other@test.com",
-      password: "secret",
-    });
-
     // Create posts for current user
     await Post.create({
       image: "uploads/my-post1.jpg",
@@ -198,7 +206,7 @@ describe("Post routes integration", () => {
       rating: 3,
       beer: beerId,
       description: "Someone else's post",
-      user: otherUser._id,
+      user: otherUserId,
     });
 
     const response = await request(app)
@@ -206,8 +214,14 @@ describe("Post routes integration", () => {
       .set("Authorization", `Bearer ${token}`);
 
     expect(response.status).toBe(200);
-    expect(response.body.message).toBe("User posts retrieved");
-    expect(response.body.data).toBeDefined();
+    expect(Array.isArray(response.body.data)).toBe(true);
+    expect(response.body.data.length).toBe(2);
+    expect(response.body.pagination.total).toBe(2);
+
+    // Verify all returned posts belong to current user
+    response.body.data.forEach((post: any) => {
+      expect(post.user._id).toBe(userId);
+    });
   });
 
   it("GET /api/posts/me supports pagination", async () => {
@@ -227,7 +241,11 @@ describe("Post routes integration", () => {
       .set("Authorization", `Bearer ${token}`);
 
     expect(response.status).toBe(200);
-    expect(response.body.data).toBeDefined();
+    expect(Array.isArray(response.body.data)).toBe(true);
+    expect(response.body.data.length).toBe(10);
+    expect(response.body.pagination.total).toBe(15);
+    expect(response.body.pagination.pages).toBe(2);
+    expect(response.body.pagination.page).toBe(1);
   });
 
   it("GET /api/posts/:id returns single post by ID", async () => {
@@ -244,8 +262,8 @@ describe("Post routes integration", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(response.body.data).toBeDefined();
-    expect(response.body.data._id).toBe(post._id.toString());
+    expect(response.body._id).toBe(post._id.toString());
+    expect(response.body.description).toBe("Single post");
   });
 
   it("GET /api/posts/:id returns 400 for invalid post ID format", async () => {
@@ -279,10 +297,13 @@ describe("Post routes integration", () => {
       .send({});
 
     expect(likeResponse.status).toBe(200);
-    expect(likeResponse.body.hasLiked).toBe(true);
+    expect(likeResponse.body.liked).toBe(true);
+    expect(likeResponse.body.message).toBe("Post liked");
+    expect(likeResponse.body.likeCount).toBe(1);
 
-    const likedPost = await Post.findById(post._id);
+    const likedPost = await Post.findById(post._id).select("+likes");
     expect(likedPost?.likes.length).toBe(1);
+    expect(likedPost?.likes[0].toString()).toBe(userId);
 
     const unlikeResponse = await request(app)
       .post(`/api/posts/${post._id.toString()}/like`)
@@ -290,15 +311,22 @@ describe("Post routes integration", () => {
       .send({});
 
     expect(unlikeResponse.status).toBe(200);
-    expect(unlikeResponse.body.hasLiked).toBe(false);
+    expect(unlikeResponse.body.liked).toBe(false);
+    expect(unlikeResponse.body.message).toBe("Post unliked");
+    expect(unlikeResponse.body.likeCount).toBe(0);
 
-    const unlikedPost = await Post.findById(post._id);
+    const unlikedPost = await Post.findById(post._id).select("+likes");
     expect(unlikedPost?.likes.length).toBe(0);
   });
 
   it("PATCH /api/posts/:id updates post with optional image file", async () => {
+    // Create old image file
+    const oldImagePath = toPublicAbsolutePath("/uploads/old-image.jpg");
+    fs.writeFileSync(oldImagePath, "old image data");
+    uploadedFiles.push(oldImagePath);
+
     const post = await Post.create({
-      image: "uploads/update.jpg",
+      image: "/uploads/old-image.jpg",
       rating: 3,
       beer: beerId,
       description: "Original description",
@@ -318,25 +346,19 @@ describe("Post routes integration", () => {
     // Verify the updated post has new image path
     const updatedPost = await Post.findById(post._id);
     expect(updatedPost?.image).toBeDefined();
-    expect(updatedPost?.image).toContain("uploads/");
+    expect(updatedPost?.image).toContain("/uploads/");
+    expect(updatedPost?.image).not.toBe("/uploads/old-image.jpg");
 
     // Verify the new file exists in public/uploads
     const newImagePath = toPublicAbsolutePath(updatedPost!.image);
     expect(fs.existsSync(newImagePath)).toBe(true);
     uploadedFiles.push(newImagePath); // Track for cleanup
+
+    // Verify old image was deleted
+    expect(fs.existsSync(oldImagePath)).toBe(false);
   });
 
   it("PATCH /api/posts/:id returns 403 if user is not post owner", async () => {
-    // Create another user
-    const otherUser = await User.create({
-      username: "other-user",
-      email: "other@test.com",
-      password: "secret",
-    });
-    const otherToken = AuthUtils.generateAccessToken({
-      userId: otherUser._id.toString(),
-    });
-
     // Create post by current user
     const post = await Post.create({
       image: "uploads/update.jpg",
@@ -405,17 +427,43 @@ describe("Post routes integration", () => {
     expect(fs.existsSync(imagePath)).toBe(false);
   });
 
-  it("DELETE /api/posts/:id returns 403 if user is not post owner", async () => {
-    // Create another user
-    const otherUser = await User.create({
-      username: "other-delete-user",
-      email: "other-delete@test.com",
-      password: "secret",
-    });
-    const otherToken = AuthUtils.generateAccessToken({
-      userId: otherUser._id.toString(),
+  it("DELETE /api/posts/:id cascades delete to comments", async () => {
+    const post = await Post.create({
+      image: "uploads/cascade.jpg",
+      rating: 4,
+      beer: beerId,
+      description: "Post with comments",
+      user: userId,
     });
 
+    // Create comments for this post
+    await Comment.create({
+      text: "First comment",
+      user: userId,
+      post: post._id,
+    });
+
+    await Comment.create({
+      text: "Second comment",
+      user: userId,
+      post: post._id,
+    });
+
+    const commentsBefore = await Comment.find({ post: post._id });
+    expect(commentsBefore.length).toBe(2);
+
+    const response = await request(app)
+      .delete(`/api/posts/${post._id.toString()}`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+
+    // Verify comments were deleted
+    const commentsAfter = await Comment.find({ post: post._id });
+    expect(commentsAfter.length).toBe(0);
+  });
+
+  it("DELETE /api/posts/:id returns 403 if user is not post owner", async () => {
     // Create post by current user
     const post = await Post.create({
       image: "uploads/delete.jpg",
@@ -456,5 +504,170 @@ describe("Post routes integration", () => {
 
     expect(response.status).toBe(404);
     expect(response.body.error).toBeDefined();
+  });
+
+  it("PATCH /api/posts/:id requires authentication", async () => {
+    const post = await Post.create({
+      image: "uploads/test.jpg",
+      rating: 4,
+      beer: beerId,
+      description: "Test post",
+      user: userId,
+    });
+
+    const response = await request(app)
+      .patch(`/api/posts/${post._id.toString()}`)
+      .send({ rating: 5 });
+
+    expect(response.status).toBe(401);
+    expect(response.body.error).toBe("Unauthorized");
+  });
+
+  it("DELETE /api/posts/:id requires authentication", async () => {
+    const post = await Post.create({
+      image: "uploads/test.jpg",
+      rating: 4,
+      beer: beerId,
+      description: "Test post",
+      user: userId,
+    });
+
+    const response = await request(app).delete(
+      `/api/posts/${post._id.toString()}`,
+    );
+
+    expect(response.status).toBe(401);
+    expect(response.body.error).toBe("Unauthorized");
+  });
+
+  it("POST /api/posts/:id/like requires authentication", async () => {
+    const post = await Post.create({
+      image: "uploads/test.jpg",
+      rating: 4,
+      beer: beerId,
+      description: "Test post",
+      user: userId,
+    });
+
+    const response = await request(app)
+      .post(`/api/posts/${post._id.toString()}/like`)
+      .send({});
+
+    expect(response.status).toBe(401);
+    expect(response.body.error).toBe("Unauthorized");
+  });
+
+  it("POST /api/posts/:id/like returns 400 for invalid post ID", async () => {
+    const response = await request(app)
+      .post("/api/posts/invalid-id/like")
+      .set("Authorization", `Bearer ${token}`)
+      .send({});
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBeDefined();
+  });
+
+  it("POST /api/posts/:id/like returns 404 for non-existent post", async () => {
+    const fakeId = "507f1f77bcf86cd799439011";
+
+    const response = await request(app)
+      .post(`/api/posts/${fakeId}/like`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({});
+
+    expect(response.status).toBe(404);
+    expect(response.body.error).toBeDefined();
+  });
+
+  it("PATCH /api/posts/:id returns 400 for empty update", async () => {
+    const post = await Post.create({
+      image: "uploads/test.jpg",
+      rating: 4,
+      beer: beerId,
+      description: "Test post",
+      user: userId,
+    });
+
+    const response = await request(app)
+      .patch(`/api/posts/${post._id.toString()}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({});
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain("No fields to update");
+  });
+
+  it("PATCH /api/posts/:id returns 400 for invalid beer ID", async () => {
+    const post = await Post.create({
+      image: "uploads/test.jpg",
+      rating: 4,
+      beer: beerId,
+      description: "Test post",
+      user: userId,
+    });
+
+    const response = await request(app)
+      .patch(`/api/posts/${post._id.toString()}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ beer: "invalid-beer-id" });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBeDefined();
+  });
+
+  it("PATCH /api/posts/:id returns 400 for non-existent beer", async () => {
+    const post = await Post.create({
+      image: "uploads/test.jpg",
+      rating: 4,
+      beer: beerId,
+      description: "Test post",
+      user: userId,
+    });
+
+    const fakeBeerId = "507f1f77bcf86cd799439011";
+
+    const response = await request(app)
+      .patch(`/api/posts/${post._id.toString()}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ beer: fakeBeerId });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain("Beer not found");
+  });
+
+  it("PATCH /api/posts/:id returns 400 for invalid rating", async () => {
+    const post = await Post.create({
+      image: "uploads/test.jpg",
+      rating: 4,
+      beer: beerId,
+      description: "Test post",
+      user: userId,
+    });
+
+    const response = await request(app)
+      .patch(`/api/posts/${post._id.toString()}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ rating: 10 });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain("Rating must be");
+  });
+
+  it("PATCH /api/posts/:id returns 400 for empty description", async () => {
+    const post = await Post.create({
+      image: "uploads/test.jpg",
+      rating: 4,
+      beer: beerId,
+      description: "Test post",
+      user: userId,
+    });
+
+    const response = await request(app)
+      .patch(`/api/posts/${post._id.toString()}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ description: "   " });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain("Description is required");
   });
 });
