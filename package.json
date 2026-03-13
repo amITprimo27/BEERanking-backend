@@ -23,11 +23,12 @@
     "test:comment": "tsc && jest --runInBand --detectOpenHandles --forceExit src/tests/routes/comment.routes.test.ts"
   },
   "dependencies": {
+    "@google/genai": "^1.17.0",
     "bcrypt": "^6.0.0",
     "body-parser": "^2.2.0",
+    "cohere-ai": "^7.20.0",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
-    "@google/genai": "^1.17.0",
     "google-auth-library": "^10.6.1",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^8.19.3",

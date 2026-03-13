@@ -1,20 +1,21 @@
 import fs from "fs/promises";
 import path from "path";
 import dotenv from "dotenv";
-import { GoogleGenAI } from "@google/genai";
-import { IProfileScores } from "../models/beer.model";
+import { CohereClient } from "cohere-ai";
+import { IBeer, IProfileScores } from "../models/beer.model";
 import {
   EMBEDDING_DIMENSIONS,
   EMBEDDING_MODEL,
   EMBEDDING_TASK_TYPE,
 } from "../config/embedding.config";
+import { Document } from "mongoose";
 
 const PROJECT_ROOT = path.resolve(__dirname, "../../");
 const DEFAULT_ENV_PATH = path.join(PROJECT_ROOT, "env", ".env.dev");
 const INPUT_PATH = path.join(__dirname, "data", "beerData.json");
 const OUTPUT_PATH = path.join(__dirname, "data", "beerDataWithEmbeddings.json");
 
-const BATCH_SIZE = 100;
+const BATCH_SIZE = 96;
 const TPM_LIMIT = 28_000;
 
 type RawBeerInput = {
@@ -27,21 +28,9 @@ type RawBeerInput = {
   search_blob: string; // From your example input
 };
 
-const REQUIRED_KEYS: Array<keyof IProfileScores> = [
-  "Astringency",
-  "Body",
-  "Alcohol",
-  "Bitter",
-  "Sweet",
-  "Sour",
-  "Salty",
-  "Fruits",
-  "Hoppy",
-  "Spices",
-  "Malty",
-];
-
-const processBeerRecord = (beer: RawBeerInput) => {
+const processBeerRecord = (
+  beer: RawBeerInput,
+): Omit<IBeer, keyof Document | "createdAt" | "updatedAt"> => {
   // Custom confidence thresholds per category
   const categoryConfig = {
     Mouthfeel: { keys: ["Astringency", "Body", "Alcohol"], K: 15 },
@@ -85,10 +74,16 @@ const processBeerRecord = (beer: RawBeerInput) => {
   ].join(" | ");
 
   return {
-    ...beer,
+    // ...beer,
+    name: beer.name,
+    brewery: beer.brewery,
+    style: beer.style,
+    abv: beer.abv,
+    description: beer.description,
     normalizedProfileScores,
     originalProfileScores: beer.profile_scores,
     searchBlob,
+    embedding: [], // Placeholder, will be filled after embedding generation
   };
 };
 
@@ -97,7 +92,7 @@ const estimateTokens = (texts: string[]) =>
 
 const run = async () => {
   dotenv.config({ path: DEFAULT_ENV_PATH });
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_AI_API_KEY! });
+  const ai = new CohereClient({ token: process.env.COHERE_API_KEY! });
 
   const rawData = JSON.parse(
     await fs.readFile(INPUT_PATH, "utf-8"),
@@ -127,18 +122,17 @@ const run = async () => {
     console.log(`📦 Batch ${Math.floor(i / BATCH_SIZE) + 1}/${totalBatches}`);
 
     try {
-      const response = await ai.models.embedContent({
+      const response = await ai.v2.embed({
+        texts,
         model: EMBEDDING_MODEL,
-        contents: texts,
-        config: {
-          taskType: EMBEDDING_TASK_TYPE,
-          outputDimensionality: EMBEDDING_DIMENSIONS,
-        },
+        inputType: "search_document",
+        outputDimension: EMBEDDING_DIMENSIONS,
+        embeddingTypes: ["float"],
       });
 
-      if (response.embeddings) {
-        response.embeddings.forEach((emb) => {
-          if (emb.values) allEmbeddings.push(emb.values);
+      if (response.embeddings.float) {
+        response.embeddings.float.forEach((emb) => {
+          allEmbeddings.push(emb);
         });
       }
 
