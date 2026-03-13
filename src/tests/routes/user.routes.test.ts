@@ -60,7 +60,7 @@ describe("User routes integration", () => {
       abv: 6.5,
       description: "A test beer for favorites",
       searchBlob: "test ipa",
-      profileScores: {
+      normalizedProfileScores: {
         Astringency: 1,
         Body: 2,
         Alcohol: 3,
@@ -72,6 +72,19 @@ describe("User routes integration", () => {
         Hoppy: 5,
         Spices: 1,
         Malty: 1,
+      },
+      originalProfileScores: {
+        Astringency: 10,
+        Body: 20,
+        Alcohol: 30,
+        Bitter: 40,
+        Sweet: 10,
+        Sour: 10,
+        Salty: 0,
+        Fruits: 20,
+        Hoppy: 50,
+        Spices: 10,
+        Malty: 10,
       },
     });
 

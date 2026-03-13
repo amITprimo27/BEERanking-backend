@@ -8,12 +8,13 @@ import { postRouter } from "./routes/post.routes";
 import { userRouter } from "./routes/user.route";
 import { authRouter } from "./routes/auth.routes";
 import { UPLOADS_DIR } from "./utils/paths.utils";
+import { ensureVectorIndex } from "./scripts/vector-index";
 
 const app = express();
 
 dotenv.config({ path: "/env/.env.dev" });
 
-const intApp = () => {
+const initApp = () => {
   const promise = new Promise<Express>((resolve, reject) => {
     app.use(express.urlencoded({ extended: false }));
     app.use(express.json());
@@ -58,7 +59,9 @@ const intApp = () => {
       console.error("MONGODB_URI is not defined in the environment variables.");
       reject(new Error("MONGODB_URI is not defined"));
     } else {
-      mongoose.connect(dbUri, {}).then(() => {
+      mongoose.connect(dbUri, {}).then(async () => {
+        // This ensures the index exists as soon as the DB connects
+        await ensureVectorIndex();
         resolve(app);
       });
     }
@@ -75,4 +78,4 @@ const intApp = () => {
   return promise;
 };
 
-export default intApp;
+export default initApp;

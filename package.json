@@ -9,7 +9,8 @@
   "scripts": {
     "start": "tsc && node --env-file=./env/.env.dev ./dist/src/server.js",
     "dev": "nodemon ./src/server.ts",
-    "import:beers": "ts-node ./src/scripts/import-beers.ts",
+    "vector-index": "ts-node ./src/scripts/vector-index.ts",
+    "vector-index:recreate": "ts-node ./src/scripts/vector-index.ts --recreate",
     "lint": "eslint . --ext .ts",
     "test": "tsc && jest --runInBand --detectOpenHandles --forceExit",
     "test:auth": "tsc && jest --runInBand --detectOpenHandles --forceExit src/tests/routes/auth.routes.test.ts",

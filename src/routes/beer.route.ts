@@ -5,9 +5,15 @@ const router = Router();
 const beerController = new BeerController();
 
 /**
- * GET /api/beers/search/ai
- * AI search - parse natural language query
+ * GET /api/beers/search
+ * lexical/fuzzy search by name and brewery.
  */
-router.get("/search/ai", (req, res) => beerController.aiSearch(req, res));
+router.get("/search", (req, res) => beerController.search(req, res));
+
+/**
+ * POST /api/beers/ask
+ * Phase 1 AI route stub.
+ */
+router.post("/ask", (req, res) => beerController.ask(req, res));
 
 export { router as beerRouter };
