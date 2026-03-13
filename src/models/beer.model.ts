@@ -100,7 +100,6 @@ const beerSchema = new Schema<IBeer>(
       type: [Number],
       required: true,
       select: false, // Don't return embeddings in regular queries
-      // Note: text-embedding-3-small produces 1536 dimensions
     },
 
     // Ensure searchBlob is used to store the descriptive prose

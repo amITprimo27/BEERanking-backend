@@ -3,13 +3,17 @@ import request from "supertest";
 import { beerRouter } from "../../routes/beer.route";
 import { connectTestDb, clearTestDb, disconnectTestDb } from "../helpers/db";
 import { Beer } from "../../models/beer.model";
+import { EMBEDDING_DIMENSIONS } from "../../config/embedding.config";
 
 describe("Beer routes integration", () => {
   const app = express();
   app.use(express.json());
   app.use("/api/beers", beerRouter);
 
-  const embeddingVector = Array.from({ length: 1536 }, () => 0.001);
+  const embeddingVector = Array.from(
+    { length: EMBEDDING_DIMENSIONS },
+    () => 0.001,
+  );
 
   beforeAll(async () => {
     await connectTestDb();
