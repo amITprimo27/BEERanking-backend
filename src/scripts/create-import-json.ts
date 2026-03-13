@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import dotenv from "dotenv";
+import { GoogleGenAI } from "@google/genai";
 import { IProfileScores } from "../models/beer.model";
 import {
   EMBEDDING_DIMENSIONS,
@@ -8,21 +9,25 @@ import {
   EMBEDDING_TASK_TYPE,
 } from "../config/embedding.config";
 
-type RawBeerRecord = {
+const PROJECT_ROOT = path.resolve(__dirname, "../../");
+const DEFAULT_ENV_PATH = path.join(PROJECT_ROOT, "env", ".env.dev");
+const INPUT_PATH = path.join(__dirname, "data", "beerData.json");
+const OUTPUT_PATH = path.join(__dirname, "data", "beerDataWithEmbeddings.json");
+
+const BATCH_SIZE = 100;
+const TPM_LIMIT = 28_000;
+
+type RawBeerInput = {
   name: string;
   brewery: string;
   style: string;
   abv: number;
+  description: string;
   profile_scores: IProfileScores;
+  search_blob: string; // From your example input
 };
 
-type ProcessedBeerRecord = RawBeerRecord & {
-  normalizedProfileScores: IProfileScores;
-  originalProfileScores: IProfileScores;
-  searchBlob: string;
-};
-
-const REQUIRED_PROFILE_KEYS: Array<keyof IProfileScores> = [
+const REQUIRED_KEYS: Array<keyof IProfileScores> = [
   "Astringency",
   "Body",
   "Alcohol",
@@ -36,136 +41,122 @@ const REQUIRED_PROFILE_KEYS: Array<keyof IProfileScores> = [
   "Malty",
 ];
 
-const generateFlavorProse = (beer: RawBeerRecord): string => {
-  const sortedTraits = [...REQUIRED_PROFILE_KEYS]
-    .sort((a, b) => beer.profile_scores[b] - beer.profile_scores[a])
-    .slice(0, 3)
-    .map((t) => t.toLowerCase());
-
-  return (
-    `Beer: ${beer.name} | Brewery: ${beer.brewery} | Style: ${beer.style} | ABV: ${beer.abv}% | ` +
-    `Notes: ${sortedTraits.join(", ")}. ` +
-    `Profile: ${REQUIRED_PROFILE_KEYS.map((k) => `${k}: ${beer.profile_scores[k]}`).join(", ")}`
-  );
-};
-
-const batchEmbedWithGemini = async (
-  input: string[],
-  apiKey: string,
-): Promise<number[][]> => {
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/${EMBEDDING_MODEL}:batchEmbedContents?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        requests: input.map((text) => ({
-          model: EMBEDDING_MODEL,
-          taskType: EMBEDDING_TASK_TYPE,
-          content: {
-            parts: [{ text }],
-          },
-        })),
-      }),
-    },
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `Gemini embedding request failed (${response.status}): ${errorText}`,
-    );
-  }
-
-  const payload = (await response.json()) as {
-    embeddings?: Array<{ values?: number[] }>;
+const processBeerRecord = (beer: RawBeerInput) => {
+  // Custom confidence thresholds per category
+  const categoryConfig = {
+    Mouthfeel: { keys: ["Astringency", "Body", "Alcohol"], K: 15 },
+    Taste: { keys: ["Bitter", "Sweet", "Sour", "Salty"], K: 35 },
+    FlavorAndAroma: { keys: ["Fruits", "Hoppy", "Spices", "Malty"], K: 30 },
   };
 
-  const vectors = (payload.embeddings ?? []).map((entry) => entry.values ?? []);
+  const normalizedProfileScores = {} as IProfileScores;
+  const categoryStrings: string[] = [];
 
-  if (
-    vectors.length !== input.length ||
-    vectors.some((v) => v.length !== EMBEDDING_DIMENSIONS)
-  ) {
-    throw new Error(
-      `Gemini embedding response mismatch. Expected ${input.length} vectors of ${EMBEDDING_DIMENSIONS} dimensions.`,
-    );
+  for (const [categoryName, config] of Object.entries(categoryConfig)) {
+    const clusterNotes: string[] = [];
+
+    config.keys.forEach((k) => {
+      const rawValue = beer.profile_scores[k as keyof IProfileScores] || 0;
+
+      // Use the category-specific K
+      const score = (rawValue / (rawValue + config.K)) * 10;
+      normalizedProfileScores[k as keyof IProfileScores] = Number(
+        score.toFixed(2),
+      );
+
+      if (score > 1.5) {
+        clusterNotes.push(`${k}: ${score.toFixed(1)}/10`);
+      }
+    });
+
+    if (clusterNotes.length > 0) {
+      categoryStrings.push(
+        `${categoryName} attributes: ${clusterNotes.join(", ")}`,
+      );
+    }
   }
 
-  return vectors;
+  const searchBlob = [
+    `Beer: ${beer.name}`,
+    `Brewery: ${beer.brewery}`,
+    `Style: ${beer.style}`,
+    `Description: ${beer.description}`,
+    ...categoryStrings,
+  ].join(" | ");
+
+  return {
+    ...beer,
+    normalizedProfileScores,
+    originalProfileScores: beer.profile_scores,
+    searchBlob,
+  };
 };
 
+const estimateTokens = (texts: string[]) =>
+  texts.reduce((sum, t) => sum + Math.ceil(t.length / 4), 0);
+
 const run = async () => {
-  dotenv.config({ path: "./env/.env.dev" });
-  const geminiApiKey = process.env.GEMINI_AI_API_KEY;
-
-  if (!geminiApiKey) {
-    throw new Error("Missing GEMINI_AI_API_KEY in env/.env.dev");
-  }
-
-  const inputPath = path.resolve(process.cwd(), "./data/raw_beers.json");
-  const outputPath = path.resolve(
-    process.cwd(),
-    "./data/golden_beers_with_vectors.json",
-  );
+  dotenv.config({ path: DEFAULT_ENV_PATH });
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_AI_API_KEY! });
 
   const rawData = JSON.parse(
-    await fs.readFile(inputPath, "utf-8"),
-  ) as RawBeerRecord[];
+    await fs.readFile(INPUT_PATH, "utf-8"),
+  ) as RawBeerInput[];
+  console.log(`🍺 Processing ${rawData.length} records...`);
 
-  // 1. Normalize
-  const maxValues = {} as Record<keyof IProfileScores, number>;
-  REQUIRED_PROFILE_KEYS.forEach(
-    (k) =>
-      (maxValues[k] =
-        Math.max(...rawData.map((b) => b.profile_scores[k])) || 1),
-  );
+  const processedData = rawData.map(processBeerRecord);
+  const totalBatches = Math.ceil(processedData.length / BATCH_SIZE);
+  const allEmbeddings: number[][] = [];
 
-  const processedWithoutVectors: ProcessedBeerRecord[] = rawData.map(
-    (beer) => ({
-      ...beer,
-      normalizedProfileScores: REQUIRED_PROFILE_KEYS.reduce(
-        (acc, k) => ({
-          ...acc,
-          [k]: (beer.profile_scores[k] / maxValues[k]) * 10,
-        }),
-        {} as IProfileScores,
-      ),
-      originalProfileScores: beer.profile_scores,
-      searchBlob: generateFlavorProse(beer),
-    }),
-  );
+  let tokensInMinute = 0;
+  let startTime = Date.now();
 
-  // 2. Embed (batch requests to stay under provider limits)
-  const batchSize = 100;
-  const embeddings: number[][] = [];
-  console.log(`Embedding ${processedWithoutVectors.length} beers...`);
+  for (let i = 0; i < processedData.length; i += BATCH_SIZE) {
+    const chunk = processedData.slice(i, i + BATCH_SIZE);
+    const texts = chunk.map((b) => b.searchBlob);
+    const batchTokens = estimateTokens(texts);
 
-  for (let i = 0; i < processedWithoutVectors.length; i += batchSize) {
-    const batch = processedWithoutVectors.slice(i, i + batchSize);
-    const batchVectors = await batchEmbedWithGemini(
-      batch.map((b) => b.searchBlob),
-      geminiApiKey,
-    );
-    embeddings.push(...batchVectors);
-    console.log(
-      `Embedded ${Math.min(i + batchSize, processedWithoutVectors.length)}/${processedWithoutVectors.length}`,
-    );
+    if (tokensInMinute + batchTokens > TPM_LIMIT) {
+      const wait = Math.max(0, 60000 - (Date.now() - startTime));
+      console.log(`⏳ TPM Limit. Waiting ${Math.ceil(wait / 1000)}s...`);
+      await new Promise((r) => setTimeout(r, wait));
+      tokensInMinute = 0;
+      startTime = Date.now();
+    }
+
+    console.log(`📦 Batch ${Math.floor(i / BATCH_SIZE) + 1}/${totalBatches}`);
+
+    try {
+      const response = await ai.models.embedContent({
+        model: EMBEDDING_MODEL,
+        contents: texts,
+        config: {
+          taskType: EMBEDDING_TASK_TYPE,
+          outputDimensionality: EMBEDDING_DIMENSIONS,
+        },
+      });
+
+      if (response.embeddings) {
+        response.embeddings.forEach((emb) => {
+          if (emb.values) allEmbeddings.push(emb.values);
+        });
+      }
+
+      tokensInMinute += batchTokens;
+      await new Promise((r) => setTimeout(r, 1000));
+    } catch (err) {
+      console.error("❌ API Error:", err);
+      break;
+    }
   }
 
-  // 3. Save "Golden" File
-  const finalData = processedWithoutVectors.map((beer, i: number) => ({
-    ...beer,
-    embedding: embeddings[i],
-    embeddingModel: EMBEDDING_MODEL,
+  const finalOutput = processedData.map((record, i) => ({
+    ...record,
+    embedding: allEmbeddings[i],
   }));
 
-  await fs.writeFile(outputPath, JSON.stringify(finalData, null, 2));
-  console.log(
-    `Successfully created Golden File with vectors at: ${outputPath}`,
-  );
+  await fs.writeFile(OUTPUT_PATH, JSON.stringify(finalOutput, null, 2));
+  console.log(`\n✅ Successfully generated ${finalOutput.length} records.`);
 };
 
 run().catch(console.error);

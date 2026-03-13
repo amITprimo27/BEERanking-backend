@@ -9,6 +9,9 @@
   "scripts": {
     "start": "tsc && node --env-file=./env/.env.dev ./dist/src/server.js",
     "dev": "nodemon ./src/server.ts",
+    "data:embed": "ts-node ./src/scripts/create-import-json.ts",
+    "data:import": "ts-node ./src/scripts/import-full-data.ts",
+    "data:build": "npm run data:embed && npm run data:import && npm run vector-index",
     "vector-index": "ts-node ./src/scripts/vector-index.ts",
     "vector-index:recreate": "ts-node ./src/scripts/vector-index.ts --recreate",
     "lint": "eslint . --ext .ts",
@@ -24,6 +27,7 @@
     "body-parser": "^2.2.0",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "@google/genai": "^1.17.0",
     "google-auth-library": "^10.6.1",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^8.19.3",
