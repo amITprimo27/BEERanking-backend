@@ -5,6 +5,8 @@ import { connectTestDb, clearTestDb, disconnectTestDb } from "../helpers/db";
 import { Beer } from "../../models/beer.model";
 import { AI_CONFIG } from "../../config/ai.config";
 import { aiService } from "../../services/ai.service";
+import { User } from "../../models/user.model";
+import { AuthUtils } from "../../utils/auth.utils";
 
 jest.mock("../../services/ai.service", () => ({
   aiService: {
@@ -22,6 +24,8 @@ describe("Beer routes integration", () => {
   app.use(express.json());
   app.use("/api/beers", beerRouter);
 
+  let token = "";
+
   const embeddingVector = Array.from(
     { length: AI_CONFIG.COHERE.DIMENSIONS },
     () => 0.001,
@@ -38,6 +42,13 @@ describe("Beer routes integration", () => {
   beforeEach(async () => {
     await clearTestDb();
     jest.clearAllMocks();
+
+    const user = await User.create({
+      username: "beer-test-user",
+      email: "beer-test-user@test.com",
+      password: "secret",
+    });
+    token = AuthUtils.generateAccessToken({ userId: user._id.toString() });
   });
 
   it("GET /api/beers/search should return fuzzy lexical results", async () => {
@@ -185,10 +196,21 @@ describe("Beer routes integration", () => {
   it("POST /api/beers/ask should validate prompt", async () => {
     const response = await request(app)
       .post("/api/beers/ask")
+      .set("Authorization", `Bearer ${token}`)
       .send({ question: "What beer is best for summer?" });
 
     expect(response.status).toBe(400);
     expect(response.body.error).toContain("valid search prompt");
+    expect(mockGetSmartBeerSearch).not.toHaveBeenCalled();
+  });
+
+  it("POST /api/beers/ask should require authentication", async () => {
+    const response = await request(app)
+      .post("/api/beers/ask")
+      .send({ prompt: "What beer is best for summer?" });
+
+    expect(response.status).toBe(401);
+    expect(response.body.error).toBe("Unauthorized");
     expect(mockGetSmartBeerSearch).not.toHaveBeenCalled();
   });
 
@@ -245,6 +267,7 @@ describe("Beer routes integration", () => {
 
     const response = await request(app)
       .post("/api/beers/ask")
+      .set("Authorization", `Bearer ${token}`)
       .send({ prompt: "What beer is best for summer?" });
 
     expect(response.status).toBe(200);
@@ -259,6 +282,7 @@ describe("Beer routes integration", () => {
 
     const response = await request(app)
       .post("/api/beers/ask")
+      .set("Authorization", `Bearer ${token}`)
       .send({ prompt: "Recommend me a sour stout" });
 
     expect(response.status).toBe(429);
@@ -270,6 +294,7 @@ describe("Beer routes integration", () => {
 
     const response = await request(app)
       .post("/api/beers/ask")
+      .set("Authorization", `Bearer ${token}`)
       .send({ prompt: "Recommend me an ipa" });
 
     expect(response.status).toBe(500);
