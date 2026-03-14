@@ -11,7 +11,6 @@ export type RecommendationType =
   | "NO_MATCH";
 
 export type SommelierAnalysis = {
-  isMatchFound: boolean;
   recommendationType: RecommendationType;
   explanation: string;
   topPickId: string | null;
@@ -40,7 +39,6 @@ class AIService {
     if (beers.length === 0) {
       return {
         analysis: {
-          isMatchFound: false,
           recommendationType: "NO_MATCH",
           explanation: "No matches in the cellar.",
           topPickId: null,
@@ -55,7 +53,7 @@ class AIService {
 
     return {
       analysis,
-      beers: analysis.isMatchFound ? beers : [],
+      beers: analysis.recommendationType !== "NO_MATCH" ? beers : [],
     };
   }
 
@@ -129,11 +127,6 @@ class AIService {
     const responseSchema = {
       type: "OBJECT",
       properties: {
-        isMatchFound: {
-          type: "BOOLEAN",
-          description:
-            "Set to false if results are totally irrelevant to the query.",
-        },
         recommendationType: {
           type: "STRING",
           enum: [
@@ -146,13 +139,13 @@ class AIService {
         explanation: {
           type: "STRING",
           description:
-            "Your sommelier analysis. Mention specific Facts and Sensory scores.",
+            "our sommelier analysis. Convert numeric sensory scores into descriptive language. Reference beer names and breweries; NEVER include ID strings.",
         },
         topPickId: {
           type: "STRING",
           nullable: true,
           description:
-            "The ID of the single best beer. Null if it's a tie or no match.",
+            "The ID of the single best beer. Only populated if one beer stands out as the best. Otherwise, it should be null.",
         },
         recommendedIds: {
           type: "ARRAY",
@@ -160,12 +153,7 @@ class AIService {
           description: "All beer IDs mentioned in the explanation.",
         },
       },
-      required: [
-        "isMatchFound",
-        "recommendationType",
-        "explanation",
-        "recommendedIds",
-      ],
+      required: ["recommendationType", "explanation", "recommendedIds"],
     };
 
     try {
@@ -178,6 +166,12 @@ class AIService {
               {
                 text: `
                     ${sommelierPersona}
+                    
+                    - YOUR CELLAR (The Rules):
+                            1. "The Cellar is Final": You only recommend beers from the DATABASE RESULTS. If it’s not in the cellar, it doesn't exist for this conversation.
+                            2. "The Sensory Bridge": Don't just list numbers. Turn scores into descriptions. (e.g., Instead of "Bitter: 8.5", say "It boasts a sharp, bracing bitterness that cuts right through.")
+                            3. "No Robot Talk": Avoid phrases like "Based on the data provided" or "I have found a match." Talk like you're standing at a bar.
+                    
                     ${domainKnowledge}
                     ${matchTypeInstructions}
                     
@@ -186,9 +180,9 @@ class AIService {
 
                     INSTRUCTIONS:
                     - Determine the Match Type first.
-                    - If 'SINGLE_BEST', justify why that one beer stands above the rest.
-                    - If 'CLOSE_ALTERNATIVES', start with: "I couldn't find an exact match, but here is what I recommend based on your preferences..."
-                    `,
+                        - If 'SINGLE_BEST', justify why that one beer stands above the rest.
+                        - If 'CLOSE_ALTERNATIVES', start with: "I couldn't find an exact match, but here is what I recommend based on your preferences..."
+                `,
               },
             ],
           },
@@ -209,7 +203,6 @@ class AIService {
     } catch (error) {
       console.error("Gemini Analysis Error:", error);
       return {
-        isMatchFound: false,
         recommendationType: "NO_MATCH",
         explanation: "The cellar is currently closed for maintenance.",
         recommendedIds: [],
