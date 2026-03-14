@@ -1,19 +1,17 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import { Beer } from "../models/beer.model";
-import { EMBEDDING_DIMENSIONS } from "../config/embedding.config";
-
-const INDEX_NAME = "vector_index";
+import { AI_CONFIG } from "../config/ai.config";
 
 const INDEX_DEFINITION = {
-  name: INDEX_NAME,
+  name: AI_CONFIG.DB.VECTOR_INDEX_NAME,
   type: "vectorSearch",
   definition: {
     fields: [
       {
         type: "vector",
         path: "embedding",
-        numDimensions: EMBEDDING_DIMENSIONS,
+        numDimensions: AI_CONFIG.COHERE.DIMENSIONS,
         similarity: "cosine",
       },
       {
@@ -33,7 +31,9 @@ export const ensureVectorIndex = async () => {
   try {
     const collection = Beer.collection;
     const existingIndexes = await collection.listSearchIndexes().toArray();
-    if (existingIndexes.find((idx) => idx.name === INDEX_NAME)) {
+    if (
+      existingIndexes.find((idx) => idx.name === AI_CONFIG.DB.VECTOR_INDEX_NAME)
+    ) {
       console.log("Vector index already exists.");
       return;
     }
@@ -48,17 +48,23 @@ export const ensureVectorIndex = async () => {
 const dropVectorIndex = async () => {
   const collection = Beer.collection;
   const existingIndexes = await collection.listSearchIndexes().toArray();
-  const existing = existingIndexes.find((idx) => idx.name === INDEX_NAME);
+  const existing = existingIndexes.find(
+    (idx) => idx.name === AI_CONFIG.DB.VECTOR_INDEX_NAME,
+  );
 
   if (existing) {
-    console.log(`Dropping existing "${INDEX_NAME}" index...`);
-    await collection.dropSearchIndex(INDEX_NAME);
+    console.log(
+      `Dropping existing "${AI_CONFIG.DB.VECTOR_INDEX_NAME}" index...`,
+    );
+    await collection.dropSearchIndex(AI_CONFIG.DB.VECTOR_INDEX_NAME);
 
     // Atlas needs a moment before the index can be recreated
     console.log("Waiting for index to finish dropping...");
     await new Promise((resolve) => setTimeout(resolve, 5000));
   } else {
-    console.log(`No existing "${INDEX_NAME}" found, nothing to drop.`);
+    console.log(
+      `No existing "${AI_CONFIG.DB.VECTOR_INDEX_NAME}" found, nothing to drop.`,
+    );
   }
 };
 

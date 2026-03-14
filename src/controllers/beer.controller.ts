@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { PipelineStage } from "mongoose";
 import { Beer, IBeer } from "../models/beer.model";
 import { BaseController } from "./base.controller";
+import { aiService } from "../services/ai.service";
 
 export class BeerController extends BaseController<IBeer> {
   constructor() {
@@ -171,10 +172,34 @@ export class BeerController extends BaseController<IBeer> {
   /**
    * Phase 1 AI endpoint stub. Retrieval + generation will be implemented in Phase 2.
    */
-  async ask(_req: Request, res: Response) {
-    return res.status(501).json({
-      error: "AI ask is not implemented yet.",
-      nextStep: "Implement retrieval + LLM response in Phase 2",
-    });
+  async ask(req: Request, res: Response) {
+    try {
+      const { prompt } = req.body;
+
+      if (!prompt || typeof prompt !== "string") {
+        return res
+          .status(400)
+          .json({ error: "Please provide a valid search prompt." });
+      }
+
+      // Process the full RAG flow
+      const result = await aiService.getSmartBeerSearch(prompt);
+
+      // Return 200 even for 'isMatchFound: false' so the frontend can show the AI's explanation
+      return res.status(200).json(result);
+    } catch (error: any) {
+      console.error("Search Controller Error:", error);
+
+      // Handle specific API quota errors
+      if (error.status === 429) {
+        return res.status(429).json({
+          error: "The sommelier is a bit busy. Please try again in a moment.",
+        });
+      }
+
+      return res
+        .status(500)
+        .json({ error: "Internal Server Error during beer analysis." });
+    }
   }
 }

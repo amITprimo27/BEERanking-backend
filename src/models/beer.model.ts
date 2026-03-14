@@ -23,7 +23,7 @@ export interface IBeer extends Document {
   normalizedProfileScores: IProfileScores;
   originalProfileScores: IProfileScores;
   searchBlob: string; // We will use this for the "Prose" we generated
-  embedding: number[]; // Add this for Vector Search
+  embedding: number[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -119,5 +119,4 @@ beerSchema.index({ name: 1 });
 beerSchema.index({ brewery: 1 });
 beerSchema.index({ style: 1 });
 beerSchema.index({ searchBlob: "text" }); // Full-text search index
-
 export const Beer = mongoose.model<IBeer>("Beer", beerSchema);

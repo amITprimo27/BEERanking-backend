@@ -3,7 +3,7 @@ import request from "supertest";
 import { beerRouter } from "../../routes/beer.route";
 import { connectTestDb, clearTestDb, disconnectTestDb } from "../helpers/db";
 import { Beer } from "../../models/beer.model";
-import { EMBEDDING_DIMENSIONS } from "../../config/embedding.config";
+import { AI_CONFIG } from "../../config/ai.config";
 
 describe("Beer routes integration", () => {
   const app = express();
@@ -11,7 +11,7 @@ describe("Beer routes integration", () => {
   app.use("/api/beers", beerRouter);
 
   const embeddingVector = Array.from(
-    { length: EMBEDDING_DIMENSIONS },
+    { length: AI_CONFIG.COHERE.DIMENSIONS },
     () => 0.001,
   );
 

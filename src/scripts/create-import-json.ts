@@ -3,19 +3,16 @@ import path from "path";
 import dotenv from "dotenv";
 import { CohereClient } from "cohere-ai";
 import { IBeer, IProfileScores } from "../models/beer.model";
-import {
-  EMBEDDING_DIMENSIONS,
-  EMBEDDING_MODEL,
-  EMBEDDING_TASK_TYPE,
-} from "../config/embedding.config";
+
 import { Document } from "mongoose";
+import { AI_CONFIG } from "../config/ai.config";
 
 const PROJECT_ROOT = path.resolve(__dirname, "../../");
 const DEFAULT_ENV_PATH = path.join(PROJECT_ROOT, "env", ".env.dev");
 const INPUT_PATH = path.join(__dirname, "data", "beerData.json");
 const OUTPUT_PATH = path.join(__dirname, "data", "beerDataWithEmbeddings.json");
 
-const BATCH_SIZE = 96;
+const BATCH_SIZE = AI_CONFIG.COHERE.BATCH_SIZE;
 const TPM_LIMIT = 28_000;
 
 type RawBeerInput = {
@@ -124,9 +121,9 @@ const run = async () => {
     try {
       const response = await ai.v2.embed({
         texts,
-        model: EMBEDDING_MODEL,
-        inputType: "search_document",
-        outputDimension: EMBEDDING_DIMENSIONS,
+        model: AI_CONFIG.COHERE.MODEL,
+        inputType: AI_CONFIG.COHERE.INPUT_TYPE_DOC,
+        outputDimension: AI_CONFIG.COHERE.DIMENSIONS,
         embeddingTypes: ["float"],
       });
 
