@@ -10,6 +10,8 @@ const authController = new AuthController();
  *   post:
  *     summary: Sign up a new user
  *     description: Creates a new user with email and password.
+ *     tags:
+ *       - Auth
  *     requestBody:
  *       required: true
  *       content:
@@ -45,6 +47,8 @@ router.post("/signup", (req, res) => authController.signup(req, res));
  *   post:
  *     summary: Sign in a user
  *     description: Authenticates a user with username and password.
+ *     tags:
+ *       - Auth
  *     requestBody:
  *       required: true
  *       content:
@@ -77,6 +81,8 @@ router.post("/signin", (req, res) => authController.signin(req, res));
  *   post:
  *     summary: Refresh access token
  *     description: Uses a refresh token to obtain a new access token.
+ *     tags:
+ *       - Auth
  *     requestBody:
  *       required: true
  *       content:
@@ -104,6 +110,8 @@ router.post("/refresh", (req, res) => authController.refresh(req, res));
  *   post:
  *     summary: Sign up with Google OAuth
  *     description: Creates a new user from Google token.
+ *     tags:
+ *       - Auth
  *     requestBody:
  *       required: true
  *       content:
@@ -137,6 +145,8 @@ router.post("/signup/google", (req, res) =>
  *   post:
  *     summary: Sign in with Google OAuth
  *     description: Authenticates a user with Google token.
+ *     tags:
+ *       - Auth
  *     requestBody:
  *       required: true
  *       content:
