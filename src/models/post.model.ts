@@ -12,6 +12,7 @@ export interface IPost extends Document {
   updatedAt: Date;
   likeCount: number; // Virtual field
   commentCount: number; // Virtual field
+  likedByCurrentUser: boolean; // Virtual field
 }
 
 const postSchema = new Schema<IPost>(
@@ -66,6 +67,16 @@ postSchema.virtual("likeCount").get(function () {
   }
 
   return typeof this.likesCount === "number" ? this.likesCount : 0;
+});
+
+postSchema.virtual("likedByCurrentUser").get(function () {
+  const currentUserId = this.$locals.currentUserId;
+
+  if (!currentUserId || !Array.isArray(this.likes)) {
+    return false;
+  }
+
+  return this.likes.some((likeUserId) => likeUserId.toString() === currentUserId);
 });
 
 // Virtual populate for comment count
