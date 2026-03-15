@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import { Comment, IComment } from "../models/comment.model";
 import { Post } from "../models/post.model";
 import { BaseController } from "./base.controller";
+import { AuthRequest } from "../middlewares/auth.middleware";
+import mongoose from "mongoose";
 
 export class CommentController extends BaseController<IComment> {
   constructor() {
@@ -14,13 +16,61 @@ export class CommentController extends BaseController<IComment> {
    * Requires authentication
    */
   async addComment(req: Request, res: Response) {
-    // TODO: Implement comment creation
-    // - Validate post exists
-    // - Validate text length (1-5000 chars)
-    // - Create comment with user ID from auth token
-    // - Return created comment with populated user
     const { postId } = req.params;
-    res.status(201).json({ message: "Comment added", data: req.body });
+
+    if (!this.isValidObjectId(postId)) {
+      return res.status(400).json({ error: "Invalid post ID format" });
+    }
+
+    try {
+      const userId = this.requireAuthenticatedUser(req as AuthRequest);
+      const text = typeof req.body.text === "string" ? req.body.text.trim() : "";
+
+      if (!text) {
+        this.throwHttpError(400, "Comment text is required");
+      }
+
+      if (text.length > 5000) {
+        this.throwHttpError(400, "Comment text must be between 1 and 5000 characters");
+      }
+
+      const postExists = await Post.exists({ _id: postId });
+      if (!postExists) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+
+      const created = await Comment.create({
+        text,
+        post: new mongoose.Types.ObjectId(postId),
+        user: new mongoose.Types.ObjectId(userId),
+      });
+
+      const populatedCreated = await Comment.findById(created._id).populate(
+        "user",
+        "username email profilePic",
+      );
+
+      return res.status(201).json({
+        message: "Comment added",
+        data: populatedCreated ?? created,
+      });
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        "status" in error &&
+        typeof (error as { status?: unknown }).status === "number"
+      ) {
+        return res
+          .status((error as { status: number }).status)
+          .json({ error: error.message });
+      }
+
+      const status = this.getErrorStatus(error);
+      return res.status(status).json({
+        error:
+          error instanceof Error ? error.message : "An unknown error occurred",
+      });
+    }
   }
 
   /**
@@ -30,49 +80,47 @@ export class CommentController extends BaseController<IComment> {
    * Sorted by createdAt descending (newest first)
    */
   async getCommentsByPost(req: Request, res: Response) {
-    // TODO: Implement get comments by post ID
-    // - Validate post ID format
-    // - Verify post exists
-    // - Extract page and limit from query
-    // - Query comments where post === postId, sorted by createdAt desc
-    // - Populate user (select username, email, profilePic)
-    // - Return with pagination info
     const { postId } = req.params;
-    res.json({ message: "Get comments", data: [], pagination: {} });
+
+    if (!this.isValidObjectId(postId)) {
+      return res.status(400).json({ error: "Invalid post ID format" });
+    }
+
+    try {
+      const postExists = await Post.exists({ _id: postId });
+      if (!postExists) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+
+      const { page, limit, skip } = this.getPaginationParams(req, {
+        defaultLimit: 20,
+      });
+
+      const [data, total] = await Promise.all([
+        Comment.find({ post: postId })
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .populate("user", "username email profilePic"),
+        Comment.countDocuments({ post: postId }),
+      ]);
+
+      return res.json({
+        data,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      });
+    } catch (error) {
+      const status = this.getErrorStatus(error);
+      return res.status(status).json({
+        error:
+          error instanceof Error ? error.message : "An unknown error occurred",
+      });
+    }
   }
 
-  /**
-   * Delete comment by ID
-   * Only the comment owner or admin can delete
-   * Requires authentication
-   */
-  async deleteComment(req: Request, res: Response) {
-    // TODO: Implement comment deletion
-    // - Validate comment ID format
-    // - Find comment
-    // - Check if current user is owner (compare user IDs)
-    // - Return 403 if not owner
-    // - Delete comment
-    // - Return success
-    const { commentId } = req.params;
-    res.json({ message: "Comment deleted" });
-  }
-
-  /**
-   * Update comment text
-   * Only the comment owner can edit
-   * Requires authentication
-   */
-  async updateComment(req: Request, res: Response) {
-    // TODO: Implement comment update
-    // - Validate comment ID format
-    // - Find comment
-    // - Check if current user is owner
-    // - Return 403 if not owner
-    // - Validate new text length (1-5000 chars)
-    // - Update comment text
-    // - Return updated comment
-    const { commentId } = req.params;
-    res.json({ message: "Comment updated", data: req.body });
-  }
 }
