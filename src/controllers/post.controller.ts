@@ -17,6 +17,63 @@ export class PostController extends BaseController<IPost> {
     super(Post);
   }
 
+  private async getSerializedPaginated(
+    req: AuthRequest,
+    res: Response,
+    additionalFilter: mongoose.FilterQuery<IPost> = {},
+  ): Promise<void> {
+    try {
+      const { page, limit, skip } = this.getPaginationParams(req);
+      const { page: _, limit: __, ...queryFilter } = req.query;
+      const combinedFilter = { ...queryFilter, ...additionalFilter };
+      const query = this.model.find(combinedFilter).limit(limit).skip(skip);
+      const posts = await this.customizeQuery(query);
+      const total = await this.model.countDocuments(combinedFilter);
+
+      res.json({
+        data: this.serializePosts(posts, req.user?._id),
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      });
+    } catch (error) {
+      const status = this.getErrorStatus(error);
+      res.status(status).json({
+        error:
+          error instanceof Error ? error.message : "An unknown error occurred",
+      });
+    }
+  }
+
+  private serializePost(
+    post: IPost | null,
+    currentUserId?: string,
+  ): Record<string, unknown> | null {
+    if (!post) {
+      return null;
+    }
+
+    post.$locals.currentUserId = currentUserId;
+
+    const serializedPost = post.toObject({ virtuals: true }) as Record<
+      string,
+      unknown
+    > & {
+      likes?: mongoose.Types.ObjectId[];
+    };
+
+    delete serializedPost.likes;
+
+    return serializedPost;
+  }
+
+  private serializePosts(posts: IPost[], currentUserId?: string) {
+    return posts.map((post) => this.serializePost(post, currentUserId));
+  }
+
   //#region Read hooks
 
   /**
@@ -24,6 +81,7 @@ export class PostController extends BaseController<IPost> {
    */
   protected override async fetchById(id: string) {
     return Post.findById(id)
+      .select("+likes")
       .populate("user", "username profilePic")
       .populate("beer")
       .populate("commentCount");
@@ -36,10 +94,41 @@ export class PostController extends BaseController<IPost> {
     query: mongoose.Query<Array<IPost>, IPost>,
   ) {
     return query
+      .select("+likes")
       .sort({ createdAt: -1 })
       .populate("user", "username profilePic")
       .populate("beer")
       .populate("commentCount");
+  }
+
+  override async get(req: Request, res: Response): Promise<void> {
+    await this.getSerializedPaginated(req as AuthRequest, res);
+  }
+
+  override async getById(
+    req: Request,
+    res: Response,
+  ): Promise<Response | undefined> {
+    const id = req.params.id;
+
+    if (!this.isValidObjectId(id)) {
+      return res.status(400).json({ error: "Invalid ID format" });
+    }
+
+    try {
+      const data = await this.fetchById(id);
+      if (!data) {
+        return res.status(404).json({ error: "Data not found" });
+      }
+
+      return res.json(this.serializePost(data, (req as AuthRequest).user?._id));
+    } catch (error) {
+      const status = this.getErrorStatus(error);
+      return res.status(status).json({
+        error:
+          error instanceof Error ? error.message : "An unknown error occurred",
+      });
+    }
   }
   //#endregion
 
@@ -129,7 +218,7 @@ export class PostController extends BaseController<IPost> {
 
     return {
       message: "Post added",
-      data: populatedCreated,
+      data: this.serializePost(populatedCreated),
     };
   }
   //#endregion
@@ -243,7 +332,7 @@ export class PostController extends BaseController<IPost> {
   protected override async formatPatchResponse(updated: IPost) {
     const populatedUpdated = await this.fetchById(updated._id.toString());
 
-    return { message: "Post updated", data: populatedUpdated };
+    return { message: "Post updated", data: this.serializePost(populatedUpdated) };
   }
   //#endregion
 
@@ -316,7 +405,7 @@ export class PostController extends BaseController<IPost> {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    return this.getPaginated(req, res, { user: userId });
+    return this.getSerializedPaginated(req, res, { user: userId });
   }
 
   //#endregion

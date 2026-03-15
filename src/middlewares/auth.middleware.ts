@@ -23,3 +23,25 @@ export const authMiddleware = (
     return res.status(401).json({ error: "Unauthorized" });
   }
 };
+
+export const optionalAuthMiddleware = (
+  req: AuthRequest,
+  _res: Response,
+  next: NextFunction,
+) => {
+  const authHeader = req.headers.authorization;
+  const token = AuthUtils.extractTokenFromHeader(authHeader);
+
+  if (!token) {
+    return next();
+  }
+
+  try {
+    const decoded = AuthUtils.verifyToken(token);
+    req.user = { _id: decoded.userId };
+  } catch (_error) {
+    req.user = undefined;
+  }
+
+  return next();
+};

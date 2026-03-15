@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { PostController } from "../controllers/post.controller";
-import { authMiddleware } from "../middlewares/auth.middleware";
+import {
+  authMiddleware,
+  optionalAuthMiddleware,
+} from "../middlewares/auth.middleware";
 import { uploadImage } from "../middlewares/multer.middleware";
 import { commentRouter } from "./comment.routes";
 
@@ -12,9 +15,12 @@ const postController = new PostController();
  * /api/posts:
  *   get:
  *     summary: Get all posts
- *     description: Returns paginated posts.
+ *     description: Returns paginated posts. Authentication is optional and enables likedByCurrentUser in the response.
  *     tags:
  *       - Posts
+ *     security:
+ *       - bearerAuth: []
+ *       - {}
  *     parameters:
  *       - in: query
  *         name: page
@@ -34,7 +40,7 @@ const postController = new PostController();
  *       200:
  *         description: Posts fetched successfully
  */
-router.get("/", (req, res) => postController.get(req, res));
+router.get("/", optionalAuthMiddleware, (req, res) => postController.get(req, res));
 
 /**
  * @swagger
@@ -74,8 +80,12 @@ router.get("/me", authMiddleware, (req, res) =>
  * /api/posts/{id}:
  *   get:
  *     summary: Get post by ID
+ *     description: Returns a single post. Authentication is optional and enables likedByCurrentUser in the response.
  *     tags:
  *       - Posts
+ *     security:
+ *       - bearerAuth: []
+ *       - {}
  *     parameters:
  *       - in: path
  *         name: id
@@ -90,7 +100,9 @@ router.get("/me", authMiddleware, (req, res) =>
  *       404:
  *         description: Post not found
  */
-router.get("/:id", (req, res) => postController.getById(req, res));
+router.get("/:id", optionalAuthMiddleware, (req, res) =>
+  postController.getById(req, res),
+);
 
 /**
  * @swagger

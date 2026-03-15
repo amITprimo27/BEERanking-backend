@@ -172,7 +172,7 @@ describe("Post routes integration", () => {
   });
 
   it("GET /api/posts returns stored posts", async () => {
-    await Post.create({
+    const post = await Post.create({
       image: "uploads/test2.jpg",
       rating: 5,
       beer: beerId,
@@ -186,6 +186,31 @@ describe("Post routes integration", () => {
     expect(Array.isArray(response.body.data)).toBe(true);
     expect(response.body.data.length).toBeGreaterThan(0);
     expect(response.body.pagination).toBeDefined();
+    expect(response.body.data[0]._id).toBe(post._id.toString());
+    expect(response.body.data[0].likedByCurrentUser).toBe(false);
+    expect(response.body.data[0].likes).toBeUndefined();
+  });
+
+  it("GET /api/posts marks likedByCurrentUser for authenticated user", async () => {
+    const post = await Post.create({
+      image: "uploads/liked-list.jpg",
+      rating: 5,
+      beer: beerId,
+      description: "Liked in list",
+      user: otherUserId,
+      likes: [userId],
+      likesCount: 1,
+    });
+
+    const response = await request(app)
+      .get("/api/posts")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toHaveLength(1);
+    expect(response.body.data[0]._id).toBe(post._id.toString());
+    expect(response.body.data[0].likedByCurrentUser).toBe(true);
+    expect(response.body.data[0].likes).toBeUndefined();
   });
 
   it("GET /api/posts/me requires authentication", async () => {
@@ -234,6 +259,8 @@ describe("Post routes integration", () => {
     // Verify all returned posts belong to current user
     response.body.data.forEach((post: any) => {
       expect(post.user._id).toBe(userId);
+      expect(post.likedByCurrentUser).toBe(false);
+      expect(post.likes).toBeUndefined();
     });
   });
 
@@ -277,6 +304,29 @@ describe("Post routes integration", () => {
     expect(response.status).toBe(200);
     expect(response.body._id).toBe(post._id.toString());
     expect(response.body.description).toBe("Single post");
+    expect(response.body.likedByCurrentUser).toBe(false);
+    expect(response.body.likes).toBeUndefined();
+  });
+
+  it("GET /api/posts/:id marks likedByCurrentUser for authenticated user", async () => {
+    const post = await Post.create({
+      image: "uploads/single-liked.jpg",
+      rating: 4,
+      beer: beerId,
+      description: "Single liked post",
+      user: otherUserId,
+      likes: [userId],
+      likesCount: 1,
+    });
+
+    const response = await request(app)
+      .get(`/api/posts/${post._id.toString()}`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body._id).toBe(post._id.toString());
+    expect(response.body.likedByCurrentUser).toBe(true);
+    expect(response.body.likes).toBeUndefined();
   });
 
   it("GET /api/posts/:id returns 400 for invalid post ID format", async () => {
