@@ -20,28 +20,13 @@ export interface IBeer extends Document {
   style: string;
   abv: number;
   description: string;
-  profileScores: IProfileScores;
-  searchBlob: string;
+  normalizedProfileScores: IProfileScores;
+  originalProfileScores: IProfileScores;
+  searchBlob: string; // We will use this for the "Prose" we generated
+  embedding: number[];
   createdAt: Date;
   updatedAt: Date;
 }
-
-const profileScoresSchema = new Schema<IProfileScores>(
-  {
-    Astringency: { type: Number, required: true, min: 0 },
-    Body: { type: Number, required: true, min: 0 },
-    Alcohol: { type: Number, required: true, min: 0 },
-    Bitter: { type: Number, required: true, min: 0 },
-    Sweet: { type: Number, required: true, min: 0 },
-    Sour: { type: Number, required: true, min: 0 },
-    Salty: { type: Number, required: true, min: 0 },
-    Fruits: { type: Number, required: true, min: 0 },
-    Hoppy: { type: Number, required: true, min: 0 },
-    Spices: { type: Number, required: true, min: 0 },
-    Malty: { type: Number, required: true, min: 0 },
-  },
-  { _id: false },
-);
 
 const beerSchema = new Schema<IBeer>(
   {
@@ -70,14 +55,57 @@ const beerSchema = new Schema<IBeer>(
       type: String,
       required: true,
     },
-    profileScores: {
+    normalizedProfileScores: {
       select: false,
-      type: profileScoresSchema,
+      type: new Schema<IProfileScores>(
+        {
+          Astringency: { type: Number, required: true, min: 0, max: 10 },
+          Body: { type: Number, required: true, min: 0, max: 10 },
+          Alcohol: { type: Number, required: true, min: 0, max: 10 },
+          Bitter: { type: Number, required: true, min: 0, max: 10 },
+          Sweet: { type: Number, required: true, min: 0, max: 10 },
+          Sour: { type: Number, required: true, min: 0, max: 10 },
+          Salty: { type: Number, required: true, min: 0, max: 10 },
+          Fruits: { type: Number, required: true, min: 0, max: 10 },
+          Hoppy: { type: Number, required: true, min: 0, max: 10 },
+          Spices: { type: Number, required: true, min: 0, max: 10 },
+          Malty: { type: Number, required: true, min: 0, max: 10 },
+        },
+        { _id: false },
+      ),
       required: true,
     },
-    searchBlob: {
+    originalProfileScores: {
       select: false,
+      type: new Schema<IProfileScores>(
+        {
+          Astringency: { type: Number, required: true, min: 0 },
+          Body: { type: Number, required: true, min: 0 },
+          Alcohol: { type: Number, required: true, min: 0 },
+          Bitter: { type: Number, required: true, min: 0 },
+          Sweet: { type: Number, required: true, min: 0 },
+          Sour: { type: Number, required: true, min: 0 },
+          Salty: { type: Number, required: true, min: 0 },
+          Fruits: { type: Number, required: true, min: 0 },
+          Hoppy: { type: Number, required: true, min: 0 },
+          Spices: { type: Number, required: true, min: 0 },
+          Malty: { type: Number, required: true, min: 0 },
+        },
+        { _id: false },
+      ),
+      required: true,
+    },
+    // Add the embedding field here
+    embedding: {
+      type: [Number],
+      required: true,
+      select: false, // Don't return embeddings in regular queries
+    },
+
+    // Ensure searchBlob is used to store the descriptive prose
+    searchBlob: {
       type: String,
+      select: false, // Don't return searchBlob in regular queries
       required: true,
     },
   },
@@ -91,5 +119,4 @@ beerSchema.index({ name: 1 });
 beerSchema.index({ brewery: 1 });
 beerSchema.index({ style: 1 });
 beerSchema.index({ searchBlob: "text" }); // Full-text search index
-
 export const Beer = mongoose.model<IBeer>("Beer", beerSchema);

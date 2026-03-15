@@ -11,7 +11,21 @@ class ControllerHttpError extends Error {
   }
 }
 
+type PaginationOptions = {
+  defaultPage?: number;
+  defaultLimit?: number;
+};
+
+type PaginationParams = {
+  page: number;
+  limit: number;
+  skip: number;
+};
+
 export class BaseController<T> {
+  protected static readonly DEFAULT_LIMIT = 10;
+  protected static readonly DEFAULT_PAGE = 1;
+
   constructor(protected model: mongoose.Model<T>) {}
 
   //#region Common helpers
@@ -49,6 +63,26 @@ export class BaseController<T> {
     }
     return defaultValue;
   }
+
+  protected getPaginationParams(
+    req: Request,
+    options: PaginationOptions = {},
+  ): PaginationParams {
+    const defaultPage = options.defaultPage ?? BaseController.DEFAULT_PAGE;
+    const defaultLimit = options.defaultLimit ?? BaseController.DEFAULT_LIMIT;
+
+    const rawPage = this.parseQueryInt(req.query.page, defaultPage);
+    const rawLimit = this.parseQueryInt(req.query.limit, defaultLimit);
+
+    const page = Math.max(rawPage, 1);
+    const limit = Math.max(rawLimit, 1);
+
+    return {
+      page,
+      limit,
+      skip: (page - 1) * limit,
+    };
+  }
   //#endregion
 
   //#region Read (GET)
@@ -66,9 +100,7 @@ export class BaseController<T> {
     additionalFilter: mongoose.FilterQuery<T> = {},
   ) {
     try {
-      const page = this.parseQueryInt(req.query.page, 1);
-      const limit = this.parseQueryInt(req.query.limit, 10);
-      const skip = (page - 1) * limit;
+      const { page, limit, skip } = this.getPaginationParams(req);
 
       const { page: _, limit: __, ...queryFilter } = req.query;
       const combinedFilter = { ...queryFilter, ...additionalFilter };
@@ -228,17 +260,11 @@ export class BaseController<T> {
   //#endregion
 
   //#region Update (PATCH)
-  protected async authorizeUpdate(
-    _req: Request,
-    _entity: T,
-  ): Promise<void> {
+  protected async authorizeUpdate(_req: Request, _entity: T): Promise<void> {
     this.requireAuthenticatedUser(_req);
   }
 
-  protected async validatePatch(
-    _req: Request,
-    _entity: T,
-  ): Promise<void> {
+  protected async validatePatch(_req: Request, _entity: T): Promise<void> {
     // no-op by default
   }
 

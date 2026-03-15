@@ -50,7 +50,7 @@ describe("Post routes integration", () => {
       abv: 5,
       description: "A test beer",
       searchBlob: "test lager",
-      profileScores: {
+      normalizedProfileScores: {
         Astringency: 1,
         Body: 1,
         Alcohol: 1,
@@ -62,6 +62,19 @@ describe("Post routes integration", () => {
         Hoppy: 1,
         Spices: 1,
         Malty: 1,
+      },
+      originalProfileScores: {
+        Astringency: 10,
+        Body: 10,
+        Alcohol: 10,
+        Bitter: 10,
+        Sweet: 10,
+        Sour: 10,
+        Salty: 10,
+        Fruits: 10,
+        Hoppy: 10,
+        Spices: 10,
+        Malty: 10,
       },
     });
 

@@ -12,6 +12,8 @@ const userController = new UserController();
  *   get:
  *     summary: Get current authenticated user
  *     description: Returns the currently authenticated user with favorite beers populated.
+ *     tags:
+ *       - Users
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -32,6 +34,8 @@ router.get("/me", authMiddleware, (req, res) => userController.getMe(req, res));
  *   patch:
  *     summary: Update current authenticated user
  *     description: Partially updates username, favorite beers, and optional profile picture.
+ *     tags:
+ *       - Users
  *     security:
  *       - bearerAuth: []
  *     requestBody:
