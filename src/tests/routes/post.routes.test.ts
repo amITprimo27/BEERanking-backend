@@ -660,7 +660,7 @@ describe("Post routes integration", () => {
     expect(response.body.error).toContain("No fields to update");
   });
 
-  it("PATCH /api/posts/:id returns 400 for invalid beer ID", async () => {
+  it("PATCH /api/posts/:id returns 400 when trying to change beer", async () => {
     const post = await Post.create({
       image: "uploads/test.jpg",
       rating: 4,
@@ -675,10 +675,10 @@ describe("Post routes integration", () => {
       .send({ beer: "invalid-beer-id" });
 
     expect(response.status).toBe(400);
-    expect(response.body.error).toBeDefined();
+    expect(response.body.error).toContain("Cannot change beer");
   });
 
-  it("PATCH /api/posts/:id returns 400 for non-existent beer", async () => {
+  it("PATCH /api/posts/:id returns 400 when trying to change beer to same beer", async () => {
     const post = await Post.create({
       image: "uploads/test.jpg",
       rating: 4,
@@ -687,15 +687,13 @@ describe("Post routes integration", () => {
       user: userId,
     });
 
-    const fakeBeerId = "507f1f77bcf86cd799439011";
-
     const response = await request(app)
       .patch(`/api/posts/${post._id.toString()}`)
       .set("Authorization", `Bearer ${token}`)
-      .send({ beer: fakeBeerId });
+      .send({ beer: beerId });
 
     expect(response.status).toBe(400);
-    expect(response.body.error).toContain("Beer not found");
+    expect(response.body.error).toContain("Cannot change beer");
   });
 
   it("PATCH /api/posts/:id returns 400 for invalid rating", async () => {
