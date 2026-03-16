@@ -241,6 +241,10 @@ export class PostController extends BaseController<IPost> {
   ): Promise<void> {
     const { rating, beer, description } = req.body;
 
+    if (beer !== undefined) {
+      this.throwHttpError(400, "Cannot change beer after post creation");
+    }
+
     if (rating !== undefined) {
       const parsedRating = Number(rating);
       if (
@@ -251,17 +255,6 @@ export class PostController extends BaseController<IPost> {
         this.throwHttpError(400, "Rating must be a number between 1 and 5");
       }
       req.body.rating = parsedRating;
-    }
-
-    if (beer !== undefined) {
-      if (typeof beer !== "string" || !this.isValidObjectId(beer)) {
-        this.throwHttpError(400, "Invalid beer ID format");
-      }
-
-      const beerExists = await Beer.exists({ _id: beer });
-      if (!beerExists) {
-        this.throwHttpError(400, "Beer not found");
-      }
     }
 
     if (description !== undefined) {
@@ -277,7 +270,6 @@ export class PostController extends BaseController<IPost> {
 
     if (
       req.body.rating === undefined &&
-      req.body.beer === undefined &&
       req.body.description === undefined &&
       req.body.image === undefined
     ) {
@@ -293,9 +285,6 @@ export class PostController extends BaseController<IPost> {
 
     if (req.body.rating !== undefined) {
       updateData.rating = req.body.rating;
-    }
-    if (req.body.beer !== undefined) {
-      updateData.beer = req.body.beer;
     }
     if (req.body.description !== undefined) {
       updateData.description = req.body.description;

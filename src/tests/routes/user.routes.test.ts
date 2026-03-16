@@ -2,7 +2,7 @@ import express from "express";
 import request from "supertest";
 import { userRouter } from "../../routes/user.route";
 import { connectTestDb, clearTestDb, disconnectTestDb } from "../helpers/db";
-import { User } from "../../models/user.model";
+import { MAX_FAVORITE_BEERS, User } from "../../models/user.model";
 import { Beer } from "../../models/beer.model";
 import { AuthUtils } from "../../utils/auth.utils";
 import { UPLOADS_DIR, toPublicAbsolutePath } from "../../utils/paths.utils";
@@ -217,6 +217,211 @@ describe("User routes integration", () => {
       const userWithFavorites =
         await User.findById(userId).populate("favoriteBeers");
       expect(userWithFavorites?.favoriteBeers).toHaveLength(1);
+    });
+
+    it("updates favorite beers array up to the maximum allowed", async () => {
+      const beers = await Beer.create([
+        {
+          name: "Favorite Beer 1",
+          brewery: "Test Brewery",
+          style: "IPA",
+          abv: 6.1,
+          description: "Favorite beer 1",
+          searchBlob: "favorite beer 1",
+          normalizedProfileScores: {
+            Astringency: 1,
+            Body: 2,
+            Alcohol: 3,
+            Bitter: 4,
+            Sweet: 1,
+            Sour: 1,
+            Salty: 0,
+            Fruits: 2,
+            Hoppy: 5,
+            Spices: 1,
+            Malty: 1,
+          },
+          originalProfileScores: {
+            Astringency: 10,
+            Body: 20,
+            Alcohol: 30,
+            Bitter: 40,
+            Sweet: 10,
+            Sour: 10,
+            Salty: 0,
+            Fruits: 20,
+            Hoppy: 50,
+            Spices: 10,
+            Malty: 10,
+          },
+        },
+        {
+          name: "Favorite Beer 2",
+          brewery: "Test Brewery",
+          style: "Stout",
+          abv: 7.2,
+          description: "Favorite beer 2",
+          searchBlob: "favorite beer 2",
+          normalizedProfileScores: {
+            Astringency: 2,
+            Body: 3,
+            Alcohol: 4,
+            Bitter: 5,
+            Sweet: 2,
+            Sour: 1,
+            Salty: 0,
+            Fruits: 1,
+            Hoppy: 4,
+            Spices: 2,
+            Malty: 3,
+          },
+          originalProfileScores: {
+            Astringency: 20,
+            Body: 30,
+            Alcohol: 40,
+            Bitter: 50,
+            Sweet: 20,
+            Sour: 10,
+            Salty: 0,
+            Fruits: 10,
+            Hoppy: 40,
+            Spices: 20,
+            Malty: 30,
+          },
+        },
+      ]);
+
+      const response = await request(app)
+        .patch("/api/users/me")
+        .set("Authorization", `Bearer ${token}`)
+        .send({
+          favoriteBeers: [beerId, ...beers.map((beer) => beer._id.toString())],
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.user.favoriteBeers).toHaveLength(MAX_FAVORITE_BEERS);
+    });
+
+    it("returns 400 when favoriteBeers exceeds the maximum allowed", async () => {
+      const beers = await Beer.create([
+        {
+          name: "Favorite Beer 1",
+          brewery: "Test Brewery",
+          style: "IPA",
+          abv: 6.1,
+          description: "Favorite beer 1",
+          searchBlob: "favorite beer 1",
+          normalizedProfileScores: {
+            Astringency: 1,
+            Body: 2,
+            Alcohol: 3,
+            Bitter: 4,
+            Sweet: 1,
+            Sour: 1,
+            Salty: 0,
+            Fruits: 2,
+            Hoppy: 5,
+            Spices: 1,
+            Malty: 1,
+          },
+          originalProfileScores: {
+            Astringency: 10,
+            Body: 20,
+            Alcohol: 30,
+            Bitter: 40,
+            Sweet: 10,
+            Sour: 10,
+            Salty: 0,
+            Fruits: 20,
+            Hoppy: 50,
+            Spices: 10,
+            Malty: 10,
+          },
+        },
+        {
+          name: "Favorite Beer 2",
+          brewery: "Test Brewery",
+          style: "Stout",
+          abv: 7.2,
+          description: "Favorite beer 2",
+          searchBlob: "favorite beer 2",
+          normalizedProfileScores: {
+            Astringency: 2,
+            Body: 3,
+            Alcohol: 4,
+            Bitter: 5,
+            Sweet: 2,
+            Sour: 1,
+            Salty: 0,
+            Fruits: 1,
+            Hoppy: 4,
+            Spices: 2,
+            Malty: 3,
+          },
+          originalProfileScores: {
+            Astringency: 20,
+            Body: 30,
+            Alcohol: 40,
+            Bitter: 50,
+            Sweet: 20,
+            Sour: 10,
+            Salty: 0,
+            Fruits: 10,
+            Hoppy: 40,
+            Spices: 20,
+            Malty: 30,
+          },
+        },
+        {
+          name: "Favorite Beer 3",
+          brewery: "Test Brewery",
+          style: "Lager",
+          abv: 5.4,
+          description: "Favorite beer 3",
+          searchBlob: "favorite beer 3",
+          normalizedProfileScores: {
+            Astringency: 1,
+            Body: 2,
+            Alcohol: 2,
+            Bitter: 2,
+            Sweet: 2,
+            Sour: 1,
+            Salty: 0,
+            Fruits: 1,
+            Hoppy: 2,
+            Spices: 1,
+            Malty: 2,
+          },
+          originalProfileScores: {
+            Astringency: 10,
+            Body: 20,
+            Alcohol: 20,
+            Bitter: 20,
+            Sweet: 20,
+            Sour: 10,
+            Salty: 0,
+            Fruits: 10,
+            Hoppy: 20,
+            Spices: 10,
+            Malty: 20,
+          },
+        },
+      ]);
+
+      const response = await request(app)
+        .patch("/api/users/me")
+        .set("Authorization", `Bearer ${token}`)
+        .send({
+          favoriteBeers: [beerId, ...beers.map((beer) => beer._id.toString())],
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe(
+        `favoriteBeers can contain at most ${MAX_FAVORITE_BEERS} beers`,
+      );
+
+      const unchangedUser = await User.findById(userId);
+      expect(unchangedUser?.favoriteBeers).toHaveLength(0);
     });
 
     it("returns 400 when favoriteBeers is not an array", async () => {

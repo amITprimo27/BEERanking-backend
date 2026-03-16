@@ -1,5 +1,7 @@
 import mongoose, { Document, Schema } from "mongoose";
 
+export const MAX_FAVORITE_BEERS = 3;
+
 export interface IUser extends Document {
   username: string;
   email: string;
@@ -60,5 +62,11 @@ const userSchema = new Schema<IUser>(
     timestamps: true,
   },
 );
+
+userSchema.path("favoriteBeers").validate({
+  validator: (favoriteBeers: mongoose.Types.ObjectId[]) =>
+    favoriteBeers.length <= MAX_FAVORITE_BEERS,
+  message: `A user can have at most ${MAX_FAVORITE_BEERS} favorite beers`,
+});
 
 export const User = mongoose.model<IUser>("User", userSchema);
