@@ -1,6 +1,5 @@
 import express, { Express } from "express";
 import mongoose from "mongoose";
-import dotenv from "dotenv";
 import swaggerUi from "swagger-ui-express";
 import specs from "./swagger";
 import { beerRouter } from "./routes/beer.route";
@@ -9,10 +8,9 @@ import { userRouter } from "./routes/user.route";
 import { authRouter } from "./routes/auth.routes";
 import { UPLOADS_DIR } from "./utils/paths.utils";
 import { ensureVectorIndex } from "./scripts/vector-index";
+import { EnvConfig } from "./config/env.config";
 
 const app = express();
-
-dotenv.config({ path: "/env/.env.dev" });
 
 const initApp = () => {
   const promise = new Promise<Express>((resolve, reject) => {
@@ -53,7 +51,7 @@ const initApp = () => {
 
     //TODO: react app static files
 
-    const dbUri = process.env.MONGODB_URI;
+    const dbUri = EnvConfig.instance.MONGODB_URI;
 
     if (!dbUri) {
       console.error("MONGODB_URI is not defined in the environment variables.");

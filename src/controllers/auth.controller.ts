@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { User } from "../models/user.model";
 import { AuthUtils } from "../utils/auth.utils";
 import { OAuth2Client } from "google-auth-library";
+import { EnvConfig } from "../config/env.config";
 
 export class AuthController {
   private _isDuplicateKeyError(error: unknown): boolean {
@@ -245,7 +246,9 @@ export class AuthController {
       const user = await User.findById(decoded.userId).select("+refreshTokens");
 
       if (user) {
-        user.refreshTokens = user.refreshTokens.filter((t) => t !== refreshToken);
+        user.refreshTokens = user.refreshTokens.filter(
+          (t) => t !== refreshToken,
+        );
         await user.save();
       }
 
@@ -267,7 +270,7 @@ export class AuthController {
         return res.status(400).json({ error: "Google token is required" });
       }
 
-      const clientId = process.env.GOOGLE_CLIENT_ID;
+      const clientId = EnvConfig.instance.GOOGLE_CLIENT_ID;
       if (!clientId) {
         return res
           .status(500)
@@ -364,7 +367,7 @@ export class AuthController {
         return res.status(400).json({ error: "Google token is required" });
       }
 
-      const clientId = process.env.GOOGLE_CLIENT_ID;
+      const clientId = EnvConfig.instance.GOOGLE_CLIENT_ID;
       if (!clientId) {
         return res
           .status(500)

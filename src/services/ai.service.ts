@@ -3,6 +3,7 @@ import { Beer, IBeer } from "../models/beer.model";
 import { AI_CONFIG } from "../config/ai.config";
 import { Document } from "mongoose";
 import { GoogleGenAI } from "@google/genai";
+import { EnvConfig } from "../config/env.config";
 
 export type RecommendationType =
   | "SINGLE_BEST"
@@ -23,8 +24,12 @@ class AIService {
   private readonly _gemini: GoogleGenAI;
 
   constructor() {
-    this._cohere = new CohereClient({ token: process.env.COHERE_API_KEY! });
-    this._gemini = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+    this._cohere = new CohereClient({
+      token: EnvConfig.instance.COHERE_API_KEY,
+    });
+    this._gemini = new GoogleGenAI({
+      apiKey: EnvConfig.instance.GEMINI_API_KEY,
+    });
   }
 
   async getSmartBeerSearch(

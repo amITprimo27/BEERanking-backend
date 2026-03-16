@@ -1,14 +1,12 @@
 import fs from "fs/promises";
 import path from "path";
-import dotenv from "dotenv";
 import { CohereClient } from "cohere-ai";
+import { EnvConfig } from "../config/env.config";
 import { IBeer, IProfileScores } from "../models/beer.model";
 
 import { Document } from "mongoose";
 import { AI_CONFIG } from "../config/ai.config";
 
-const PROJECT_ROOT = path.resolve(__dirname, "../../");
-const DEFAULT_ENV_PATH = path.join(PROJECT_ROOT, "env", ".env.dev");
 const INPUT_PATH = path.join(__dirname, "data", "beerData.json");
 const OUTPUT_PATH = path.join(__dirname, "data", "beerDataWithEmbeddings.json");
 
@@ -88,8 +86,7 @@ const estimateTokens = (texts: string[]) =>
   texts.reduce((sum, t) => sum + Math.ceil(t.length / 4), 0);
 
 const run = async () => {
-  dotenv.config({ path: DEFAULT_ENV_PATH });
-  const ai = new CohereClient({ token: process.env.COHERE_API_KEY! });
+  const ai = new CohereClient({ token: EnvConfig.instance.COHERE_API_KEY });
 
   const rawData = JSON.parse(
     await fs.readFile(INPUT_PATH, "utf-8"),

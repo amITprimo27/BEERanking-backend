@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
-import dotenv from "dotenv";
 import { Beer } from "../models/beer.model";
 import { AI_CONFIG } from "../config/ai.config";
+import { EnvConfig } from "../config/env.config";
 
 const INDEX_DEFINITION = {
   name: AI_CONFIG.DB.VECTOR_INDEX_NAME,
@@ -72,12 +72,10 @@ const dropVectorIndex = async () => {
 //   ts-node ./src/scripts/vector-index.ts            → connect → ensureVectorIndex() → disconnect
 //   ts-node ./src/scripts/vector-index.ts --recreate → connect → drop → ensureVectorIndex() → disconnect
 if (require.main === module) {
-  dotenv.config({ path: "./env/.env.dev" });
-
   const shouldRecreate = process.argv.includes("--recreate");
 
   const main = async () => {
-    await mongoose.connect(process.env.MONGODB_URI!);
+    await mongoose.connect(EnvConfig.instance.MONGODB_URI);
     try {
       if (shouldRecreate) {
         await dropVectorIndex();
