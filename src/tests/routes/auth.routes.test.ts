@@ -549,6 +549,71 @@ describe("Auth routes and middleware integration", () => {
     });
   });
 
+  describe("POST /api/auth/signout", () => {
+    let refreshToken: string;
+    let userId: string;
+
+    beforeEach(async () => {
+      const hashedPassword = await AuthUtils.hashPassword("password");
+      const user = await User.create({
+        username: "signoutuser",
+        email: "signout@test.com",
+        password: hashedPassword,
+      });
+      userId = user._id.toString();
+
+      const tokens = AuthUtils.generateTokens({ userId });
+      refreshToken = tokens.refreshToken;
+
+      user.refreshTokens.push(refreshToken, "another-device-token");
+      await user.save();
+    });
+
+    it("revokes only the provided refresh token", async () => {
+      const response = await request(app)
+        .post("/api/auth/signout")
+        .send({ refreshToken });
+
+      expect(response.status).toBe(200);
+      expect(response.body.message).toBe("User signed out");
+
+      const updatedUser = await User.findById(userId).select("+refreshTokens");
+      expect(updatedUser!.refreshTokens).not.toContain(refreshToken);
+      expect(updatedUser!.refreshTokens).toContain("another-device-token");
+    });
+
+    it("prevents a signed out refresh token from being reused", async () => {
+      const signoutResponse = await request(app)
+        .post("/api/auth/signout")
+        .send({ refreshToken });
+
+      expect(signoutResponse.status).toBe(200);
+
+      const refreshResponse = await request(app)
+        .post("/api/auth/refresh")
+        .send({ refreshToken });
+
+      expect(refreshResponse.status).toBe(401);
+      expect(refreshResponse.body.error).toBe("Invalid or revoked refresh token");
+    });
+
+    it("returns 400 for missing refresh token", async () => {
+      const response = await request(app).post("/api/auth/signout").send({});
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe("Refresh token is required");
+    });
+
+    it("returns 401 for invalid refresh token", async () => {
+      const response = await request(app)
+        .post("/api/auth/signout")
+        .send({ refreshToken: "invalid-token" });
+
+      expect(response.status).toBe(401);
+      expect(response.body.error).toBe("Invalid refresh token");
+    });
+  });
+
   describe("Auth middleware - Invalid/Expired tokens", () => {
     let userId = "";
     let beerId = "";

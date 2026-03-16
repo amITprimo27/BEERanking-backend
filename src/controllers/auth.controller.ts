@@ -230,6 +230,32 @@ export class AuthController {
   }
 
   /**
+   * Sign out by revoking the provided refresh token
+   * Expects { refreshToken } in body
+   */
+  async signout(req: Request, res: Response) {
+    try {
+      const { refreshToken } = req.body;
+
+      if (!refreshToken) {
+        return res.status(400).json({ error: "Refresh token is required" });
+      }
+
+      const decoded = AuthUtils.verifyToken(refreshToken);
+      const user = await User.findById(decoded.userId).select("+refreshTokens");
+
+      if (user) {
+        user.refreshTokens = user.refreshTokens.filter((t) => t !== refreshToken);
+        await user.save();
+      }
+
+      return res.json({ message: "User signed out" });
+    } catch (error) {
+      return res.status(401).json({ error: "Invalid refresh token" });
+    }
+  }
+
+  /**
    * Sign up with Google OAuth
    * Expects { googleToken } in body
    */

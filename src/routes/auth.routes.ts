@@ -106,6 +106,35 @@ router.post("/refresh", (req, res) => authController.refresh(req, res));
 
 /**
  * @swagger
+ * /api/auth/signout:
+ *   post:
+ *     summary: Sign out a user
+ *     description: Revokes the provided refresh token.
+ *     tags:
+ *       - Auth
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - refreshToken
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: User signed out successfully
+ *       400:
+ *         description: Refresh token is required
+ *       401:
+ *         description: Invalid refresh token
+ */
+router.post("/signout", (req, res) => authController.signout(req, res));
+
+/**
+ * @swagger
  * /api/auth/signup/google:
  *   post:
  *     summary: Sign up with Google OAuth
