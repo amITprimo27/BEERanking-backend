@@ -1,5 +1,9 @@
 import { Request, Response } from "express";
-import { User, IUser } from "../models/user.model";
+import {
+  User,
+  IUser,
+  MAX_FAVORITE_BEERS,
+} from "../models/user.model";
 import { BaseController } from "./base.controller";
 import { AuthRequest } from "../middlewares/auth.middleware";
 import * as fs from "fs";
@@ -111,6 +115,13 @@ export class UserController extends BaseController<IUser> {
             .status(400)
             .json({ error: "favoriteBeers must be an array" });
         }
+
+        if (beersArray.length > MAX_FAVORITE_BEERS) {
+          return res.status(400).json({
+            error: `favoriteBeers can contain at most ${MAX_FAVORITE_BEERS} beers`,
+          });
+        }
+
         updateData.favoriteBeers = beersArray;
       }
 
