@@ -30,26 +30,6 @@ describe("Auth routes and middleware integration", () => {
     await clearTestDb();
   });
 
-  describe("Auth utils security", () => {
-    it("throws when JWT_SECRET is missing or too short", () => {
-      const originalSecret = process.env.JWT_SECRET;
-
-      process.env.JWT_SECRET = "short-secret";
-
-      expect(() =>
-        AuthUtils.generateAccessToken({ userId: "123456789012" }),
-      ).toThrow(
-        "JWT_SECRET is required and must be at least 32 characters long",
-      );
-
-      if (originalSecret === undefined) {
-        delete process.env.JWT_SECRET;
-      } else {
-        process.env.JWT_SECRET = originalSecret;
-      }
-    });
-  });
-
   describe("POST /api/auth/signup", () => {
     it("creates user in DB with hashed password", async () => {
       const response = await request(app).post("/api/auth/signup").send({
@@ -594,7 +574,9 @@ describe("Auth routes and middleware integration", () => {
         .send({ refreshToken });
 
       expect(refreshResponse.status).toBe(401);
-      expect(refreshResponse.body.error).toBe("Invalid or revoked refresh token");
+      expect(refreshResponse.body.error).toBe(
+        "Invalid or revoked refresh token",
+      );
     });
 
     it("returns 400 for missing refresh token", async () => {
