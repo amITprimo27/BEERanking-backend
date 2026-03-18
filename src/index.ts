@@ -49,7 +49,7 @@ const initApp = () => {
 
     app.use("/api", apiRouter);
 
-    //TODO: react app static files
+    app.use("/", express.static("public/BEERanking-frontend/dist"));
 
     const dbUri = EnvConfig.instance.MONGODB_URI;
 
