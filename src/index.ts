@@ -9,6 +9,7 @@ import { authRouter } from "./routes/auth.routes";
 import { UPLOADS_DIR } from "./utils/paths.utils";
 import { ensureVectorIndex } from "./scripts/vector-index";
 import { EnvConfig } from "./config/env.config";
+import path from "path";
 
 const app = express();
 
@@ -50,6 +51,10 @@ const initApp = () => {
     app.use("/api", apiRouter);
 
     app.use("/", express.static("public/BEERanking-frontend/dist"));
+
+    app.get("*", (req, res) => {
+      res.sendFile(path.join("public/BEERanking-frontend/dist", "index.html"));
+    });
 
     const dbUri = EnvConfig.instance.MONGODB_URI;
 
