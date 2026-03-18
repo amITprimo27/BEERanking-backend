@@ -7,7 +7,7 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "start": "tsc && cross-env NODE_ENV=production node ./dist/src/server.js",
+    "start": "tsc && node ./dist/src/server.js",
     "start:dev": "tsc && cross-env NODE_ENV=development node ./dist/src/server.js",
     "dev": "cross-env NODE_ENV=development nodemon --exec ts-node ./src/server.ts",
     "data:embed": "cross-env NODE_ENV=development ts-node ./src/scripts/create-import-json.ts",
@@ -21,7 +21,8 @@
     "test:beer": "tsc && jest --runInBand --detectOpenHandles --forceExit src/tests/routes/beer.routes.test.ts",
     "test:post": "tsc && jest --runInBand --detectOpenHandles --forceExit src/tests/routes/post.routes.test.ts",
     "test:user": "tsc && jest --runInBand --detectOpenHandles --forceExit src/tests/routes/user.routes.test.ts",
-    "test:comment": "tsc && jest --runInBand --detectOpenHandles --forceExit src/tests/routes/comment.routes.test.ts"
+    "test:comment": "tsc && jest --runInBand --detectOpenHandles --forceExit src/tests/routes/comment.routes.test.ts",
+    "prod": "tsc -p tsconfigProduction.json && node ./dist/src/server.js"
   },
   "dependencies": {
     "@google/genai": "^1.17.0",
