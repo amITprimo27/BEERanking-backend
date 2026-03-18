@@ -10,6 +10,7 @@ import { UPLOADS_DIR } from "./utils/paths.utils";
 import { ensureVectorIndex } from "./scripts/vector-index";
 import { EnvConfig } from "./config/env.config";
 import path from "path";
+import { log } from "console";
 
 const app = express();
 
@@ -55,6 +56,7 @@ const initApp = () => {
     app.get("*", (req, res) => {
       res.sendFile(path.join("public/BEERanking-frontend/dist", "index.html"));
     });
+    console.log("Express app configured with routes and Swagger UI.");
 
     const dbUri = EnvConfig.instance.MONGODB_URI;
 
