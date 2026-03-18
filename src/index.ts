@@ -54,9 +54,12 @@ const initApp = () => {
 
     app.get(/.*/, (req, res) => {
       res.sendFile(
-        path.resolve(
-          __dirname,
-          "../public/BEERanking-frontend/dist/index.html",
+        path.join(
+          process.cwd(),
+          "public",
+          "BEERanking-frontend",
+          "dist",
+          "index.html",
         ),
       );
     });
