@@ -10,7 +10,6 @@ import { UPLOADS_DIR } from "./utils/paths.utils";
 import { ensureVectorIndex } from "./scripts/vector-index";
 import { EnvConfig } from "./config/env.config";
 import path from "path";
-import { log } from "console";
 
 const app = express();
 
