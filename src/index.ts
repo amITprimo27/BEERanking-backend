@@ -52,8 +52,13 @@ const initApp = () => {
 
     app.use("/", express.static("public/BEERanking-frontend/dist"));
 
-    app.get("/(.*)", (req, res) => {
-      res.sendFile(path.join("public/BEERanking-frontend/dist", "index.html"));
+    app.get(/.*/, (req, res) => {
+      res.sendFile(
+        path.resolve(
+          __dirname,
+          "../public/BEERanking-frontend/dist/index.html",
+        ),
+      );
     });
     console.log("Express app configured with routes and Swagger UI.");
 
