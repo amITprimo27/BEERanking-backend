@@ -55,6 +55,7 @@ const initApp = () => {
     app.get("*", (req, res) => {
       res.sendFile(path.join("public/BEERanking-frontend/dist", "index.html"));
     });
+    console.log("Express app configured with routes and Swagger UI.");
 
     const dbUri = EnvConfig.instance.MONGODB_URI;
 
